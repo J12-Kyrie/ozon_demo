@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ozon 选品助手</title>
+<link rel="icon" href="/favicon.ico" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
+<style>
+  :root {
+    --bg: #f1f3f6;
+    --card: #ffffff;
+    --border: #e3e6ea;
+    --border-subtle: #eef0f3;
+    --accent: #1a73e8;
+    --accent-hover: #1557b0;
+    --accent-light: rgba(26,115,232,.07);
+    --accent-glow: rgba(26,115,232,.18);
+    --green: #188038;
+    --green-light: #e6f4ea;
+    --red: #d93025;
+    --orange: #e37400;
+    --text: #1c1e21;
+    --text2: #606770;
+    --text3: #9aa0a6;
+    --radius: 10px;
+    --radius-sm: 6px;
+    --shadow-1: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.04);
+    --shadow-2: 0 4px 12px rgba(0,0,0,.1), 0 2px 4px rgba(0,0,0,.06);
+    --shadow-3: 0 8px 24px rgba(0,0,0,.12), 0 4px 8px rgba(0,0,0,.06);
+    --sidebar-w: 340px;
+    --font-ui: 'Sora', 'Segoe UI', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  }
+  *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:var(--font-ui); background:var(--bg); color:var(--text); display:flex; height:100vh; overflow:hidden; font-size:14px; line-height:1.5; -webkit-font-smoothing:antialiased; }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width:5px; height:5px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+  ::-webkit-scrollbar-thumb { background:#d0d4db; border-radius:99px; }
+  ::-webkit-scrollbar-thumb:hover { background:#b0b5bf; }
+
+  /* sidebar */
+  .sidebar { width:var(--sidebar-w); min-width:var(--sidebar-w); background:var(--card); border-right:1px solid var(--border); display:flex; flex-direction:column; overflow-y:auto; padding:0 14px 24px; box-shadow:var(--shadow-1); position:relative; z-index:10; }
+  .sidebar-header { padding:20px 6px 16px; border-bottom:1px solid var(--border-subtle); margin-bottom:4px; position:sticky; top:0; background:var(--card); z-index:5; }
+  .sidebar-header h1 { font-size:17px; font-weight:700; color:var(--text); letter-spacing:-0.3px; display:flex; align-items:center; gap:8px; }
+  .sidebar-header h1::before { content:''; display:inline-block; width:10px; height:10px; border-radius:3px; background:linear-gradient(135deg,#4285f4,#34a853); flex-shrink:0; }
+  .sidebar-header .subtitle { color:var(--text2); font-size:12px; margin-top:4px; padding-left:calc(10px + 8px); font-weight:400; }
+
+  /* accordion */
+  .accordion { border-bottom:1px solid var(--border-subtle); }
+  .accordion:last-child { border-bottom:none; }
+  .accordion-header { display:flex; justify-content:space-between; align-items:center; padding:11px 6px; cursor:pointer; user-select:none; font-size:11px; text-transform:uppercase; letter-spacing:1.2px; color:var(--text3); font-weight:600; transition:color 0.15s; }
+  .accordion-header:hover { color:var(--accent); }
+  .accordion.open .accordion-header { color:var(--text2); }
+  .accordion-chevron { transition:transform 0.25s cubic-bezier(.4,0,.2,1); font-size:12px; color:var(--text3); display:inline-flex; }
+  .accordion.open .accordion-chevron { transform:rotate(180deg); color:var(--accent); }
+  .accordion-body { max-height:0; overflow:hidden; transition:max-height 0.32s cubic-bezier(.4,0,.2,1), opacity 0.25s ease; opacity:0; padding:0 6px; }
+  .accordion.open .accordion-body { max-height:2000px; opacity:1; padding:0 6px 14px; }
+
+  /* fields */
+  .field { margin-bottom:13px; }
+  .field label { display:flex; justify-content:space-between; font-size:12px; margin-bottom:6px; color:var(--text2); font-weight:500; }
+  .field label .val { color:var(--accent); font-weight:700; font-family:var(--font-mono); font-size:11px; }
+  .field input[type=range] { width:100%; -webkit-appearance:none; height:4px; border-radius:2px; background:var(--border); outline:none; cursor:pointer; }
+  .field input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:14px; height:14px; border-radius:50%; background:var(--accent); cursor:pointer; box-shadow:0 0 0 3px var(--accent-light),0 1px 3px rgba(0,0,0,.2); transition:transform 0.15s,box-shadow 0.15s; }
+  .field input[type=range]::-webkit-slider-thumb:hover { transform:scale(1.15); box-shadow:0 0 0 5px var(--accent-glow),0 1px 3px rgba(0,0,0,.2); }
+  .field input[type=range]:focus::-webkit-slider-thumb { box-shadow:0 0 0 5px var(--accent-glow); }
+  .field select { width:100%; padding:8px 10px; border-radius:var(--radius-sm); border:1.5px solid var(--border); background:#fafbfc; color:var(--text); font-size:13px; font-family:var(--font-ui); outline:none; transition:border-color 0.15s,box-shadow 0.15s; cursor:pointer; }
+  .field select:focus { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-light); }
+  .field select[multiple] { height:88px; }
+
+  /* buttons */
+  .btn { width:100%; padding:9px 14px; border:none; border-radius:var(--radius-sm); cursor:pointer; font-size:13px; font-weight:600; font-family:var(--font-ui); margin-top:8px; transition:transform 0.12s,box-shadow 0.15s,background 0.15s,opacity 0.15s; position:relative; overflow:hidden; letter-spacing:0.1px; }
+  .accordion-body > .btn:first-of-type { margin-top:4px; }
+  .btn:active { transform:scale(0.98); }
+  .btn:disabled { opacity:.45; cursor:not-allowed; transform:none; }
+  .btn .ripple { position:absolute; border-radius:50%; background:rgba(255,255,255,.35); transform:scale(0); animation:rippleAnim 0.5s ease-out; pointer-events:none; }
+  @keyframes rippleAnim { to { transform:scale(4); opacity:0; } }
+  .btn-primary { background:var(--accent); color:#fff; box-shadow:0 1px 3px rgba(26,115,232,.3); }
+  .btn-primary:not(:disabled):hover { background:var(--accent-hover); box-shadow:0 3px 8px rgba(26,115,232,.35); transform:translateY(-1px); }
+  .btn-reset { background:transparent; border:1.5px solid var(--border); color:var(--text2); }
+  .btn-reset:not(:disabled):hover { border-color:var(--accent); color:var(--accent); background:var(--accent-light); }
+  .btn-scrape { background:#188038; color:#fff; box-shadow:0 1px 3px rgba(24,128,56,.3); }
+  .btn-scrape:not(:disabled):hover { background:#137333; transform:translateY(-1px); }
+  .btn-ai { background:var(--accent); color:#fff; box-shadow:0 1px 3px rgba(26,115,232,.3); }
+  .btn-ai:not(:disabled):hover { background:var(--accent-hover); transform:translateY(-1px); }
+
+  .weight-group { display:grid; grid-template-columns:1fr 1fr; gap:6px 12px; }
+  .weight-group .field { margin-bottom:6px; min-width:0; }
+  .weight-group .field label { white-space:nowrap; overflow:hidden; min-width:0; }
+  .weight-group .field label .val { flex-shrink:0; }
+
+  /* scrape */
+  .scrape-input { width:100%; padding:8px 10px; border-radius:var(--radius-sm); border:1.5px solid var(--border); background:#fafbfc; color:var(--text); font-size:12px; font-family:var(--font-ui); outline:none; transition:border-color 0.15s,box-shadow 0.15s; }
+  .scrape-input:focus { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-light); }
+  .scrape-progress { margin-top:8px; padding:8px 10px; border-radius:var(--radius-sm); background:var(--bg); border:1px solid var(--border); font-size:11px; color:var(--text2); display:none; font-family:var(--font-mono); line-height:1.6; word-break:break-all; }
+  .scrape-progress.visible { display:block; }
+  .scrape-progress .prog-status { font-weight:600; }
+  .scrape-progress .prog-status.running { color:var(--accent); }
+  .scrape-progress .prog-status.done { color:var(--green); }
+  .scrape-progress .prog-status.error { color:var(--red); }
+
+  /* AI */
+  .ai-badge { display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:20px; font-size:10px; font-weight:700; background:linear-gradient(135deg,#4285f4,#34a853); color:#fff; margin-bottom:10px; letter-spacing:0.3px; }
+  .ai-report-area { max-height:400px; overflow-y:auto; font-size:12.5px; line-height:1.65; color:var(--text); padding:4px 0; }
+  .ai-report-area h3 { font-size:13px; color:var(--accent); margin:12px 0 5px; font-weight:600; }
+  .ai-report-area h3:first-child { margin-top:0; }
+  .ai-report-area ul, .ai-report-area ol { padding-left:16px; margin:4px 0; }
+  .ai-report-area li { margin:3px 0; }
+  .ai-report-area strong { color:var(--text); }
+  .ai-report-area p { margin:5px 0; }
+  .ai-loading { display:flex; align-items:center; gap:10px; padding:14px 0; color:var(--text2); font-size:12px; }
+  .ai-loading .spinner { width:18px; height:18px; border:2.5px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.75s linear infinite; flex-shrink:0; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .ai-error { color:var(--red); font-size:12px; padding:8px 0; }
+  .ai-product-ref { cursor:pointer; color:var(--accent); border-bottom:1px dashed var(--accent); transition:background 0.15s; }
+  .ai-product-ref:hover { background:var(--accent-light); border-radius:2px; }
+  .ai-placeholder { color:var(--text3); font-size:12px; padding:10px 0; font-style:italic; }
+
+  /* main */
+  .main { flex:1; display:flex; flex-direction:column; overflow:hidden; min-width:0; }
+  .dashboard { padding:20px 24px 0; }
+  .kpi-row { display:flex; gap:12px; margin-bottom:14px; flex-wrap:wrap; }
+  .kpi-card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px; min-width:120px; flex:1; box-shadow:var(--shadow-1); transition:box-shadow 0.2s,transform 0.2s; position:relative; overflow:hidden; opacity:0; animation:kpiEntrance 0.4s ease forwards; }
+  .kpi-card:nth-child(1){animation-delay:.05s} .kpi-card:nth-child(2){animation-delay:.10s} .kpi-card:nth-child(3){animation-delay:.15s} .kpi-card:nth-child(4){animation-delay:.20s} .kpi-card:nth-child(5){animation-delay:.25s}
+  @keyframes kpiEntrance { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+  .kpi-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:var(--kpi-accent,var(--accent)); border-radius:var(--radius) var(--radius) 0 0; }
+  .kpi-card:hover { box-shadow:var(--shadow-2); transform:translateY(-2px); }
+  .kpi-card .kpi-label { font-size:11px; color:var(--text2); margin-bottom:6px; font-weight:500; letter-spacing:0.3px; }
+  .kpi-card .kpi-value { font-size:24px; font-weight:700; font-family:var(--font-mono); letter-spacing:-1px; line-height:1.15; margin-top:2px; }
+  .kpi-card .kpi-value.green{color:var(--green)} .kpi-card .kpi-value.accent{color:var(--accent)} .kpi-card .kpi-value.orange{color:var(--orange)}
+
+  .charts-row { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px; }
+  .chart-card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:16px; box-shadow:var(--shadow-1); animation:fadeUp 0.4s ease 0.3s both; min-height:240px; }
+  .chart-card canvas { display:block; width:100% !important; height:200px !important; }
+  .chart-card h3 { font-size:12px; color:var(--text2); margin-bottom:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.6px; }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+  /* tabs */
+  .tab-bar { display:flex; padding:0 24px; border-bottom:1px solid var(--border); background:var(--card); position:relative; }
+  .tab-indicator { position:absolute; bottom:0; height:2.5px; background:var(--accent); border-radius:2px 2px 0 0; transition:left 0.22s cubic-bezier(.4,0,.2,1),width 0.22s cubic-bezier(.4,0,.2,1); }
+  .tab-btn { padding:11px 20px; font-size:13px; font-weight:600; color:var(--text2); border:none; background:none; cursor:pointer; position:relative; transition:color 0.18s; font-family:var(--font-ui); letter-spacing:0.1px; white-space:nowrap; outline:none; }
+  .tab-btn:hover { color:var(--text); }
+  .tab-btn.active { color:var(--accent); }
+  .tab-btn:focus-visible { color:var(--accent); box-shadow:inset 0 0 0 2px var(--accent-glow); border-radius:4px; }
+
+  /* table */
+  .table-wrap { flex:1; overflow:auto; padding:12px 24px 24px; }
+  table { width:100%; border-collapse:separate; border-spacing:0; font-size:12.5px; }
+  thead { position:sticky; top:0; z-index:2; }
+  th { background:#f8f9fb; text-align:left; padding:9px 12px; font-weight:600; border-bottom:1.5px solid var(--border); border-top:1px solid var(--border); white-space:nowrap; cursor:pointer; user-select:none; color:var(--text2); font-size:11px; text-transform:uppercase; letter-spacing:0.7px; transition:color 0.15s,background 0.15s; }
+  th:first-child { border-left:1px solid var(--border); border-radius:var(--radius-sm) 0 0 0; }
+  th:last-child  { border-right:1px solid var(--border); border-radius:0 var(--radius-sm) 0 0; }
+  th:hover { color:var(--accent); background:#f0f4fb; }
+  th .arrow { font-size:9px; margin-left:4px; opacity:.35; transition:opacity 0.15s; }
+  th.sorted .arrow { opacity:1; color:var(--accent); }
+  tbody tr { transition:background 0.12s; }
+  tbody tr:nth-child(even) td { background:#fafbfc; }
+  tbody tr:hover td { background:var(--accent-light); }
+  tr.ai-highlight td { background:rgba(26,115,232,.14) !important; }
+  tr.ai-highlight:hover td { background:rgba(26,115,232,.22) !important; }
+  td { padding:9px 12px; border-bottom:1px solid var(--border-subtle); white-space:nowrap; color:var(--text); }
+  td.num { text-align:right; font-variant-numeric:tabular-nums; font-family:var(--font-mono); font-size:12px; }
+  td a { color:var(--accent); text-decoration:none; font-weight:500; }
+  td a:hover { text-decoration:underline; }
+  .score-bar { display:inline-flex; align-items:center; gap:8px; width:100%; max-width:160px; }
+  .score-fill { height:6px; border-radius:3px; background:linear-gradient(90deg,var(--accent),#34a853); display:inline-block; min-width:2px; max-width:100%; transition:width 0.4s cubic-bezier(.4,0,.2,1); flex-shrink:0; }
+  .score-val { font-family:var(--font-mono); font-size:11px; font-weight:500; color:var(--text2); }
+
+  /* empty state */
+  .empty-state { text-align:center; padding:64px 20px 48px; color:var(--text2); }
+  .empty-state .empty-icon { font-size:40px; margin-bottom:16px; opacity:0.35; display:block; }
+  .empty-state .empty-title { font-size:16px; font-weight:600; color:var(--text2); margin-bottom:6px; }
+  .empty-state .empty-sub { font-size:13px; color:var(--text3); }
+
+  /* skeleton */
+  .skeleton-row td { padding:11px 12px; }
+  .skeleton-cell { height:14px; border-radius:4px; background:linear-gradient(90deg,#ebebeb 25%,#f5f5f5 50%,#ebebeb 75%); background-size:200% 100%; animation:shimmer 1.4s infinite; }
+  @keyframes shimmer { to { background-position:-200% 0; } }
+
+  /* badges */
+  .badge { display:inline-block; padding:2px 7px; border-radius:20px; font-size:10px; font-weight:600; letter-spacing:0.2px; }
+  .badge-excel { background:#e8f0fe; color:#1a73e8; }
+  .badge-scraped { background:#fef3e0; color:#e37400; }
+  .badge-demo { background:#fce8e6; color:#d93025; }
+  .source-breakdown { font-size:11px; color:var(--text2); margin-top:2px; }
+
+  /* responsive */
+  @media (max-width:860px) { :root{--sidebar-w:280px} .charts-row{grid-template-columns:1fr} .kpi-row{gap:8px} .kpi-card .kpi-value{font-size:20px} .kpi-card .kpi-label{font-size:10px} .kpi-card{padding:12px 14px} }
+  @media (max-width:640px) { .sidebar{width:100%;min-width:0;position:absolute;top:0;left:0;height:100%;z-index:100;transform:translateX(-100%);transition:transform 0.3s} .sidebar.open{transform:translateX(0)} .main{width:100%} }
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<div class="sidebar">
+  <div class="sidebar-header">
+    <h1>Ozon 选品助手</h1>
+    <p class="subtitle">智能分析 &mdash; 数据驱动选品决策</p>
+  </div>
+
+  <!-- Accordion 1: Filters (expanded) -->
+  <div class="accordion open" id="acc_filters">
+    <div class="accordion-header" onclick="toggleAccordion('acc_filters')">
+      筛选条件 <span class="accordion-chevron">&#9660;</span>
+    </div>
+    <div class="accordion-body">
+      <div class="field">
+        <label>最低月销量 <span class="val" id="v_sales">{{ config.filters.min_monthly_sales }}</span></label>
+        <input type="range" id="min_monthly_sales" min="0" max="50" step="1"
+               value="{{ config.filters.min_monthly_sales }}" oninput="syncVal(this,'v_sales')">
+      </div>
+      <div class="field">
+        <label>最低毛利率 % <span class="val" id="v_margin">{{ config.filters.min_gross_margin }}</span></label>
+        <input type="range" id="min_gross_margin" min="0" max="90" step="1"
+               value="{{ config.filters.min_gross_margin }}" oninput="syncVal(this,'v_margin')">
+      </div>
+      <div class="field">
+        <label>最大跟卖数量 <span class="val" id="v_comp">{{ config.filters.max_competitors }}</span></label>
+        <input type="range" id="max_competitors" min="1" max="50" step="1"
+               value="{{ config.filters.max_competitors }}" oninput="syncVal(this,'v_comp')">
+      </div>
+      <div class="field">
+        <label>最高采购价 (元) <span class="val" id="v_cost">{{ config.filters.max_purchase_price }}</span></label>
+        <input type="range" id="max_purchase_price" min="1" max="500" step="1"
+               value="{{ config.filters.max_purchase_price }}" oninput="syncVal(this,'v_cost')">
+      </div>
+      <div class="field">
+        <label>最低售价 (卢布) <span class="val" id="v_price">{{ config.filters.min_selling_price }}</span></label>
+        <input type="range" id="min_selling_price" min="0" max="500" step="5"
+               value="{{ config.filters.min_selling_price }}" oninput="syncVal(this,'v_price')">
+      </div>
+      <div class="field">
+        <label>展示 TOP N <span class="val" id="v_topn">{{ config.output.top_n }}</span></label>
+        <input type="range" id="top_n" min="5" max="100" step="5"
+               value="{{ config.output.top_n }}" oninput="syncVal(this,'v_topn')">
+      </div>
+      <div class="field">
+        <label>一级类目（多选筛选）</label>
+        <select id="categories" multiple>
+          {% for cat in categories %}
+          <option value="{{ cat }}" {% if cat in config.filters.categories %}selected{% endif %}>{{ cat }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button class="btn btn-primary" onclick="applyFilters()">应用筛选</button>
+      <button class="btn btn-reset" onclick="resetConfig()">重置默认</button>
+    </div>
+  </div>
+
+  <!-- Accordion 2: AI Analysis (expanded) -->
+  <div class="accordion open" id="acc_ai">
+    <div class="accordion-header" onclick="toggleAccordion('acc_ai')">
+      AI 智能分析 <span class="accordion-chevron">&#9660;</span>
+    </div>
+    <div class="accordion-body">
+      <button class="btn btn-ai" id="ai_btn" onclick="runAiAnalysis()">开始 AI 分析</button>
+      <div id="ai_output">
+        <div class="ai-placeholder">点击上方按钮，AI 将分析筛选后的商品数据</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Accordion 3: Weights (collapsed) -->
+  <div class="accordion" id="acc_weights">
+    <div class="accordion-header" onclick="toggleAccordion('acc_weights')">
+      评分权重 <span class="accordion-chevron">&#9660;</span>
+    </div>
+    <div class="accordion-body">
+      <div class="weight-group">
+        <div class="field">
+          <label>毛利率 <span class="val" id="v_w1">{{ config.scoring.gross_margin }}</span></label>
+          <input type="range" id="w_gross_margin" min="0" max="1" step="0.05"
+                 value="{{ config.scoring.gross_margin }}" oninput="syncVal(this,'v_w1')">
+        </div>
+        <div class="field">
+          <label>月销量 <span class="val" id="v_w2">{{ config.scoring.monthly_sales }}</span></label>
+          <input type="range" id="w_monthly_sales" min="0" max="1" step="0.05"
+                 value="{{ config.scoring.monthly_sales }}" oninput="syncVal(this,'v_w2')">
+        </div>
+        <div class="field">
+          <label>转化率 <span class="val" id="v_w3">{{ config.scoring.conversion_rate }}</span></label>
+          <input type="range" id="w_conversion_rate" min="0" max="1" step="0.05"
+                 value="{{ config.scoring.conversion_rate }}" oninput="syncVal(this,'v_w3')">
+        </div>
+        <div class="field">
+          <label>低竞争 <span class="val" id="v_w4">{{ config.scoring.low_competition }}</span></label>
+          <input type="range" id="w_low_competition" min="0" max="1" step="0.05"
+                 value="{{ config.scoring.low_competition }}" oninput="syncVal(this,'v_w4')">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Accordion 4: Scraping (collapsed) -->
+  <div class="accordion" id="acc_scrape">
+    <div class="accordion-header" onclick="toggleAccordion('acc_scrape')">
+      数据采集 <span class="accordion-chevron">&#9660;</span>
+    </div>
+    <div class="accordion-body">
+      <div class="field">
+        <label>Ozon URL 或关键词</label>
+        <input type="text" class="scrape-input" id="scrape_input"
+               placeholder="https://www.ozon.ru/category/... 或输入关键词">
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-scrape" id="scrape_btn" onclick="startScrape(false)" style="flex:1">爬取</button>
+        <button class="btn btn-scrape" id="demo_btn" onclick="startScrape(true)" style="flex:1;background:var(--accent)">Demo</button>
+      </div>
+      <div class="scrape-progress" id="scrape_progress">
+        <span class="prog-status" id="prog_status">idle</span>
+        <span id="prog_detail"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Main Content -->
+<div class="main">
+  <!-- Dashboard -->
+  <div class="dashboard">
+    <div class="kpi-row">
+      <div class="kpi-card" style="--kpi-accent:#5f6368"><div class="kpi-label">原始商品</div><div class="kpi-value" id="st_total">-</div></div>
+      <div class="kpi-card" style="--kpi-accent:#188038"><div class="kpi-label">筛选通过</div><div class="kpi-value green" id="st_pass">-</div></div>
+      <div class="kpi-card" style="--kpi-accent:#e37400"><div class="kpi-label">平均毛利率</div><div class="kpi-value orange" id="st_margin">-</div></div>
+      <div class="kpi-card" style="--kpi-accent:#1a73e8"><div class="kpi-label">平均月销量</div><div class="kpi-value" id="st_sales">-</div></div>
+      <div class="kpi-card" style="--kpi-accent:#1a73e8"><div class="kpi-label">平均评分</div><div class="kpi-value accent" id="st_score">-</div></div>
+    </div>
+    <div class="charts-row">
+      <div class="chart-card">
+        <h3>一级类目分布</h3>
+        <canvas id="chartPie" height="200"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>毛利率 vs 月销量（明星商品）</h3>
+        <canvas id="chartScatter" height="200"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab Bar -->
+  <div class="tab-bar" id="tabBar">
+    <button class="tab-btn active" data-tab="basic" onclick="switchTab('basic')">基础信息</button>
+    <button class="tab-btn" data-tab="traffic" onclick="switchTab('traffic')">流量转化</button>
+    <button class="tab-btn" data-tab="cost" onclick="switchTab('cost')">成本结构</button>
+    <div class="tab-indicator" id="tabIndicator"></div>
+  </div>
+
+  <!-- Table -->
+  <div class="table-wrap" id="tableWrap">
+    <div class="empty-state">
+      <span class="empty-icon">&#128230;</span>
+      <div class="empty-title">加载中...</div>
+      <div class="empty-sub">正在获取商品数据</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ==================== Tab Column Definitions ====================
+const TAB_CONFIGS = {
+  basic: [
+    {key:"综合评分", label:"评分", type:"score"},
+    {key:"SkuId", label:"SKU ID", type:"sku"},
+    {key:"评级", label:"评级", type:"num"},
+    {key:"品牌", label:"品牌", type:"text"},
+    {key:"店铺名称", label:"店铺", type:"text"},
+    {key:"一级类目", label:"一级类目", type:"text"},
+    {key:"三级类目", label:"三级类目", type:"text"},
+    {key:"绿标价", label:"售价(₽)", type:"num"},
+    {key:"黑标价", label:"黑标价(₽)", type:"num"},
+    {key:"月销量", label:"月销量", type:"num"},
+    {key:"月销售额", label:"月销售额", type:"num"},
+    {key:"商品链接", label:"链接", type:"link"},
+    {key:"data_source", label:"来源", type:"badge"},
+  ],
+  traffic: [
+    {key:"SkuId", label:"SKU ID", type:"sku"},
+    {key:"一级类目", label:"类目", type:"text"},
+    {key:"展示至下单转化率", label:"下单转化率%", type:"num"},
+    {key:"商品卡加购率", label:"加购率%", type:"num"},
+    {key:"搜索至加入购物车转化率", label:"搜索加购%", type:"num"},
+    {key:"详情页访问量", label:"详情页访问", type:"num"},
+    {key:"曝光次数", label:"曝光次数", type:"num"},
+    {key:"销售动态占比", label:"销售动态%", type:"num"},
+    {key:"展示至下单转化率_est", label:"下单转化率估算%", type:"est"},
+    {key:"estimate_confidence", label:"估算置信度", type:"num"},
+    {key:"data_source", label:"来源", type:"badge"},
+  ],
+  cost: [
+    {key:"SkuId", label:"SKU ID", type:"sku"},
+    {key:"一级类目", label:"类目", type:"text"},
+    {key:"阿里巴巴采购价(预)", label:"采购价(¥)", type:"num"},
+    {key:"自定义1688运费金额", label:"1688运费", type:"num"},
+    {key:"ozon物流费(预)", label:"Ozon物流费", type:"num"},
+    {key:"平台佣金(预)", label:"平台佣金", type:"num"},
+    {key:"佣金比例%", label:"佣金%", type:"text"},
+    {key:"总成本", label:"总成本", type:"num"},
+    {key:"成本占比", label:"成本占比%", type:"num"},
+    {key:"毛利率", label:"毛利率%", type:"num"},
+    {key:"毛利率_est", label:"毛利率估算%", type:"est"},
+    {key:"利润(预)", label:"预估利润", type:"num"},
+    {key:"estimate_confidence", label:"估算置信度", type:"num"},
+    {key:"data_source", label:"来源", type:"badge"},
+  ],
+};
+
+let currentData = [];
+let currentTab = "basic";
+let sortCol = "综合评分";
+let sortAsc = false;
+let pieChart = null;
+let scatterChart = null;
+let aiProductIds = [];
+
+// ==================== Accordion ====================
+function toggleAccordion(id) {
+  document.getElementById(id).classList.toggle('open');
+}
+
+// ==================== Sync & Params ====================
+function syncVal(el, spanId) {
+  document.getElementById(spanId).textContent = el.value;
+}
+
+function gatherParams() {
+  const sel = document.getElementById("categories");
+  const cats = Array.from(sel.selectedOptions).map(o => o.value);
+  return {
+    min_monthly_sales: +document.getElementById("min_monthly_sales").value,
+    min_gross_margin: +document.getElementById("min_gross_margin").value,
+    max_competitors: +document.getElementById("max_competitors").value,
+    max_purchase_price: +document.getElementById("max_purchase_price").value,
+    min_selling_price: +document.getElementById("min_selling_price").value,
+    top_n: +document.getElementById("top_n").value,
+    categories: cats,
+    gross_margin: +document.getElementById("w_gross_margin").value,
+    monthly_sales: +document.getElementById("w_monthly_sales").value,
+    conversion_rate: +document.getElementById("w_conversion_rate").value,
+    low_competition: +document.getElementById("w_low_competition").value,
+  };
+}
+
+// ==================== Data Loading ====================
+async function applyFilters() {
+  const params = gatherParams();
+  const res = await fetch("/api/config", {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify(params),
+  });
+  const json = await res.json();
+  currentData = json.data;
+  updateStats(json.stats);
+  renderTable();
+  loadDashboardCharts();
+}
+
+async function loadData() {
+  const res = await fetch("/api/data");
+  const json = await res.json();
+  currentData = json.data;
+  updateStats(json.stats);
+  renderTable();
+  loadDashboardCharts();
+}
+
+function updateStats(s) {
+  document.getElementById("st_total").textContent = s.total_before ?? "-";
+  document.getElementById("st_pass").textContent = s.total_after ?? "-";
+  document.getElementById("st_margin").textContent = s.avg_margin != null ? s.avg_margin + "%" : "-";
+  document.getElementById("st_sales").textContent = s.avg_sales ?? "-";
+  document.getElementById("st_score").textContent = s.avg_score ?? "-";
+}
+
+// ==================== Dashboard Charts ====================
+async function loadDashboardCharts() {
+  try {
+    const res = await fetch("/api/dashboard-data");
+    const d = await res.json();
+    renderPieChart(d.categories || {});
+    renderScatterChart(d.scatter || []);
+  } catch(e) { console.error("Chart load error:", e); }
+}
+
+const CHART_COLORS = ['#4285f4','#ea4335','#fbbc04','#34a853','#ff6d01','#46bdc6','#7baaf7','#f07b72','#fdd663','#57bb8a','#ff9e80','#80cbc4'];
+
+function renderPieChart(categories) {
+  const labels = Object.keys(categories);
+  const data = Object.values(categories);
+  const ctx = document.getElementById("chartPie").getContext("2d");
+
+  if (pieChart) pieChart.destroy();
+
+  if (!labels.length) {
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    ctx.fillStyle = '#5f6368';
+    ctx.font = '13px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('暂无数据', ctx.canvas.width/2, ctx.canvas.height/2);
+    return;
+  }
+
+  pieChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: labels,
+      datasets: [{
+        data: data,
+        backgroundColor: CHART_COLORS.slice(0, labels.length),
+        borderWidth: 2,
+        borderColor: '#fff',
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position:'right', labels:{ font:{size:11}, padding:8, usePointStyle:true } },
+      },
+    }
+  });
+}
+
+function renderScatterChart(scatter) {
+  const ctx = document.getElementById("chartScatter").getContext("2d");
+
+  if (scatterChart) scatterChart.destroy();
+
+  if (!scatter.length) {
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    ctx.fillStyle = '#5f6368';
+    ctx.font = '13px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('暂无数据', ctx.canvas.width/2, ctx.canvas.height/2);
+    return;
+  }
+
+  scatterChart = new Chart(ctx, {
+    type: 'scatter',
+    data: {
+      datasets: [{
+        label: '商品',
+        data: scatter.map(s => ({x: s.margin, y: s.sales, sku: s.sku, name: s.name})),
+        backgroundColor: 'rgba(26,115,232,0.6)',
+        borderColor: 'rgba(26,115,232,0.8)',
+        pointRadius: 6,
+        pointHoverRadius: 9,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display:false },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              const p = ctx.raw;
+              return `${p.name} | 毛利:${p.x}% 销量:${p.y}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: { title:{display:true, text:'毛利率 %', font:{size:11}}, grid:{color:'rgba(0,0,0,0.05)'} },
+        y: { title:{display:true, text:'月销量', font:{size:11}}, grid:{color:'rgba(0,0,0,0.05)'} },
+      },
+    }
+  });
+}
+
+// ==================== Tab Switching ====================
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.tab === tab);
+  });
+  if (tab === 'basic' && sortCol === '综合评分') { /* keep default sort */ }
+  renderTable();
+}
+
+// ==================== Table Rendering ====================
+function renderTable() {
+  const wrap = document.getElementById("tableWrap");
+  const cols = TAB_CONFIGS[currentTab];
+
+  if (!currentData.length) {
+    wrap.innerHTML = '<div class="empty-state"><span class="empty-icon">&#128269;</span><div class="empty-title">暂无匹配商品</div><div class="empty-sub">请尝试放宽筛选条件</div></div>';
+    return;
+  }
+
+  const data = [...currentData].sort((a,b) => {
+    let va = a[sortCol], vb = b[sortCol];
+    if (va == null) return 1;
+    if (vb == null) return -1;
+    if (typeof va === "string") return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+    return sortAsc ? va - vb : vb - va;
+  });
+
+  const maxScore = Math.max(...data.map(r => r["综合评分"] || 0), 1);
+
+  let html = "<table><thead><tr>";
+  html += '<th style="width:36px">#</th>';
+  for (const col of cols) {
+    const sorted = col.key === sortCol;
+    const arrow = sorted ? (sortAsc ? "&#9650;" : "&#9660;") : "&#9650;";
+    html += `<th class="${sorted?'sorted':''}" onclick="toggleSort('${col.key}')">${col.label}<span class="arrow">${arrow}</span></th>`;
+  }
+  html += "</tr></thead><tbody>";
+
+  data.forEach((row, i) => {
+    const sku = row.SkuId != null ? String(row.SkuId) : '';
+    html += `<tr data-sku="${sku}">`;
+    html += `<td class="num" style="color:var(--text2)">${i+1}</td>`;
+    for (const col of cols) {
+      const v = row[col.key];
+      if (col.type === "score") {
+        const pct = ((v || 0) / maxScore * 100).toFixed(0);
+        html += `<td><div class="score-bar"><div class="score-fill" style="width:${pct}%"></div><span class="score-val">${v ?? '-'}</span></div></td>`;
+      } else if (col.type === "link") {
+        html += `<td>${v ? `<a href="${v}" target="_blank">查看</a>` : '-'}</td>`;
+      } else if (col.type === "sku") {
+        html += `<td style="font-family:monospace;font-size:12px">${v ?? '-'}</td>`;
+      } else if (col.type === "badge") {
+        const cls = v === "scraped" ? "badge-scraped" : v === "demo" ? "badge-demo" : "badge-excel";
+        const hasEst = (row["毛利率_est"] != null || row["展示至下单转化率_est"] != null);
+        const label = v === "scraped" ? (hasEst ? "爬取(est)" : "爬取") : v === "demo" ? "Demo" : "Excel";
+        html += `<td><span class="badge ${cls}">${label}</span></td>`;
+      } else if (col.type === "est") {
+        html += `<td class="num">${v != null ? Number(v).toLocaleString() + ' (估)' : "-"}</td>`;
+      } else if (col.type === "num") {
+        html += `<td class="num">${v != null ? Number(v).toLocaleString() : "-"}</td>`;
+      } else {
+        html += `<td>${v ?? "-"}</td>`;
+      }
+    }
+    html += "</tr>";
+  });
+  html += "</tbody></table>";
+  wrap.innerHTML = html;
+}
+
+function toggleSort(col) {
+  if (sortCol === col) { sortAsc = !sortAsc; }
+  else { sortCol = col; sortAsc = false; }
+  renderTable();
+}
+
+function resetConfig() {
+  const defaults = {
+    min_monthly_sales:2, min_gross_margin:30, max_competitors:20,
+    max_purchase_price:200, min_selling_price:50, top_n:20,
+    gross_margin:0.3, monthly_sales:0.25, conversion_rate:0.25, low_competition:0.2,
+  };
+  const map = {
+    min_monthly_sales:["min_monthly_sales","v_sales"],
+    min_gross_margin:["min_gross_margin","v_margin"],
+    max_competitors:["max_competitors","v_comp"],
+    max_purchase_price:["max_purchase_price","v_cost"],
+    min_selling_price:["min_selling_price","v_price"],
+    top_n:["top_n","v_topn"],
+    gross_margin:["w_gross_margin","v_w1"],
+    monthly_sales:["w_monthly_sales","v_w2"],
+    conversion_rate:["w_conversion_rate","v_w3"],
+    low_competition:["w_low_competition","v_w4"],
+  };
+  for (const [k,v] of Object.entries(defaults)) {
+    const [inputId, spanId] = map[k];
+    document.getElementById(inputId).value = v;
+    document.getElementById(spanId).textContent = v;
+  }
+  document.getElementById("categories").selectedIndex = -1;
+  applyFilters();
+}
+
+// ==================== AI Analysis ====================
+async function runAiAnalysis() {
+  const btn = document.getElementById("ai_btn");
+  const output = document.getElementById("ai_output");
+
+  btn.disabled = true;
+  const startTime = Date.now();
+  let timerInterval;
+
+  function updateTimer() {
+    const elapsed = Math.round((Date.now() - startTime) / 1000);
+    const timerEl = document.getElementById("ai_timer");
+    if (timerEl) timerEl.textContent = elapsed + "s";
+  }
+
+  output.innerHTML = '<div class="ai-loading"><div class="spinner"></div>DeepSeek 正在分析商品数据...<span id="ai_timer" style="margin-left:8px;color:var(--text2);font-size:12px">0s</span></div>';
+  timerInterval = setInterval(updateTimer, 1000);
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 120000);
+
+    const res = await fetch("/api/ai-analyze", {
+      method:"POST", headers:{"Content-Type":"application/json"}, body:"{}",
+      signal: controller.signal
+    });
+    clearTimeout(timeout);
+    const data = await res.json();
+
+    if (data.error) {
+      clearInterval(timerInterval);
+      const errDiv = document.createElement('div'); errDiv.className = 'ai-error'; errDiv.textContent = data.error;
+      const retryBtn = document.createElement('button'); retryBtn.className = 'btn btn-ai'; retryBtn.style.marginTop = '8px'; retryBtn.textContent = '重试'; retryBtn.onclick = runAiAnalysis;
+      output.innerHTML = ''; output.append(errDiv, retryBtn);
+      btn.disabled = false;
+      return;
+    }
+
+    clearInterval(timerInterval);
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+
+    aiProductIds = data.product_ids || [];
+    let reportHtml = DOMPurify.sanitize(marked.parse(data.report || ""));
+
+    for (const sku of aiProductIds) {
+      const re = new RegExp('(' + sku + ')', 'g');
+      reportHtml = reportHtml.replace(re, `<span class="ai-product-ref" data-sku="${sku}">$1</span>`);
+    }
+
+    output.innerHTML = `<div class="ai-badge">DeepSeek AI <span style="font-weight:normal;font-size:11px;opacity:0.75;color:#fff">${elapsed}s</span></div><div class="ai-report-area">${reportHtml}</div>`;
+
+    output.querySelectorAll('.ai-product-ref').forEach(el => {
+      el.addEventListener('mouseenter', () => {
+        const sku = el.dataset.sku;
+        document.querySelectorAll(`tr[data-sku="${sku}"]`).forEach(tr => tr.classList.add('ai-highlight'));
+      });
+      el.addEventListener('mouseleave', () => {
+        document.querySelectorAll('tr.ai-highlight').forEach(tr => tr.classList.remove('ai-highlight'));
+      });
+    });
+
+  } catch(err) {
+    clearInterval(timerInterval);
+    const msg = err.name === 'AbortError' ? '请求超时（120秒），请稍后重试' : `网络错误: ${err.message}`;
+    output.innerHTML = `<div class="ai-error">${msg}</div><button class="btn btn-ai" style="margin-top:8px" onclick="runAiAnalysis()">重试</button>`;
+  }
+  btn.disabled = false;
+}
+
+// ==================== Scrape ====================
+async function startScrape(demo) {
+  const input = document.getElementById("scrape_input").value.trim();
+  if (!demo && !input) {
+    alert("请输入 Ozon URL 或关键词，或点击 Demo 按钮测试");
+    return;
+  }
+
+  const scrapeBtn = document.getElementById("scrape_btn");
+  const demoBtn = document.getElementById("demo_btn");
+  const progBox = document.getElementById("scrape_progress");
+  const progStatus = document.getElementById("prog_status");
+  const progDetail = document.getElementById("prog_detail");
+
+  scrapeBtn.disabled = true;
+  demoBtn.disabled = true;
+  progBox.classList.add("visible");
+  progStatus.className = "prog-status running";
+  progStatus.textContent = demo ? "Demo 模式启动中" : "启动中";
+  progDetail.textContent = "";
+
+  const body = demo
+    ? {demo: true}
+    : (input.startsWith("http") ? {url: input} : {keyword: input});
+
+  try {
+    const res = await fetch("/api/scrape", {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify(body),
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      progStatus.className = "prog-status error";
+      progStatus.textContent = "错误";
+      progDetail.textContent = json.error || "请求失败";
+      scrapeBtn.disabled = false; demoBtn.disabled = false;
+      return;
+    }
+
+    const evtSource = new EventSource("/api/scrape/stream");
+    evtSource.onmessage = function(e) {
+      const data = JSON.parse(e.data);
+      const p = data.progress || {};
+      const status = p.status || "unknown";
+
+      if (status === "scraping") {
+        progStatus.className = "prog-status running";
+        progStatus.textContent = demo ? "Demo 采集中" : "爬取中";
+        progDetail.textContent = ` — 第 ${p.current_page}/${p.total_pages} 页，已找到 ${p.products_found} 件商品`;
+      } else if (status === "merging") {
+        progStatus.textContent = "合并数据中...";
+      } else if (status === "done") {
+        progStatus.className = "prog-status done";
+        progStatus.textContent = "完成";
+        progDetail.textContent = ` — 共获取 ${data.result_count} 件新商品`;
+        evtSource.close();
+        scrapeBtn.disabled = false; demoBtn.disabled = false;
+        loadData();
+      } else if (status === "blocked") {
+        progStatus.className = "prog-status error";
+        progStatus.textContent = "访问受限";
+        progDetail.textContent = ` — ${data.error || "Ozon IP 限制"}`;
+        evtSource.close();
+        scrapeBtn.disabled = false; demoBtn.disabled = false;
+      } else if (status === "error") {
+        progStatus.className = "prog-status error";
+        progStatus.textContent = "错误";
+        progDetail.textContent = ` — ${data.error || "未知错误"}`;
+        evtSource.close();
+        scrapeBtn.disabled = false; demoBtn.disabled = false;
+      }
+    };
+    evtSource.onerror = function() {
+      evtSource.close();
+      scrapeBtn.disabled = false; demoBtn.disabled = false;
+    };
+  } catch(err) {
+    progStatus.className = "prog-status error";
+    progStatus.textContent = "网络错误";
+    progDetail.textContent = err.message;
+    scrapeBtn.disabled = false; demoBtn.disabled = false;
+  }
+}
+
+// ==================== Ripple Effect ====================
+function addRipple(e) {
+  const btn = e.currentTarget;
+  const r = btn.getBoundingClientRect();
+  const size = Math.max(r.width, r.height) * 2;
+  const x = e.clientX - r.left - size / 2;
+  const y = e.clientY - r.top - size / 2;
+  const ripple = document.createElement('span');
+  ripple.className = 'ripple';
+  ripple.style.cssText = `width:${size}px;height:${size}px;left:${x}px;top:${y}px`;
+  btn.appendChild(ripple);
+  ripple.addEventListener('animationend', () => ripple.remove());
+}
+document.querySelectorAll('.btn').forEach(btn => btn.addEventListener('click', addRipple));
+
+// ==================== Tab Indicator ====================
+function positionTabIndicator() {
+  const bar = document.getElementById('tabBar');
+  const indicator = document.getElementById('tabIndicator');
+  const active = bar ? bar.querySelector('.tab-btn.active') : null;
+  if (!active || !indicator) return;
+  const barRect = bar.getBoundingClientRect();
+  const btnRect = active.getBoundingClientRect();
+  indicator.style.left  = (btnRect.left - barRect.left) + 'px';
+  indicator.style.width = btnRect.width + 'px';
+}
+
+// ==================== Skeleton Loading ====================
+function showSkeleton() {
+  const wrap = document.getElementById('tableWrap');
+  const cols = TAB_CONFIGS[currentTab];
+  let html = '<table><thead><tr>';
+  html += '<th style="width:36px">#</th>';
+  cols.forEach(c => { html += `<th>${c.label}</th>`; });
+  html += '</tr></thead><tbody>';
+  for (let i = 0; i < 8; i++) {
+    html += '<tr class="skeleton-row">';
+    html += `<td><div class="skeleton-cell" style="width:20px"></div></td>`;
+    cols.forEach(() => {
+      const w = 40 + Math.random() * 50;
+      html += `<td><div class="skeleton-cell" style="width:${w}%"></div></td>`;
+    });
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+
+// ==================== Init ====================
+// Position indicator after DOM is ready
+window.addEventListener('load', () => {
+  positionTabIndicator();
+  window.addEventListener('resize', positionTabIndicator);
+});
+
+// Reposition indicator whenever a tab button is clicked
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => requestAnimationFrame(positionTabIndicator));
+});
+
+showSkeleton();
+loadData();
+</script>
+</body>
+</html>

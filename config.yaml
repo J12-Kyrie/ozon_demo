@@ -1,0 +1,98 @@
+filters:
+  min_monthly_sales: 2
+  min_gross_margin: 30.0
+  max_competitors: 35
+  max_purchase_price: 500.0
+  min_selling_price: 50.0
+  categories: []
+scoring:
+  gross_margin: 0.3
+  monthly_sales: 0.25
+  conversion_rate: 0.25
+  low_competition: 0.2
+output:
+  top_n: 20
+scraper:
+  mode: cdp
+  cdp_endpoint: http://127.0.0.1:9222
+  detail_enrich_enabled: true
+  detail_top_k: 30
+  detail_timeout: 30
+  detail_concurrency: 3
+  delay_between_pages: 3.0
+  delay_between_requests: 1.5
+  max_pages: 5
+  timeout: 60
+  headless: true
+  user_agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
+  proxy: http://127.0.0.1:7890
+supplier1688:
+  enabled: true
+  base_url: https://page.1688.com/
+  timeout: 30
+  fetch_fields:
+    - purchase_price
+    - freight_est
+  mapping_file: supplier_mapping.csv
+  mapping_priority: keyword_first
+  slider_strategy: manual_intervention
+  match_rule: category_based
+  default_priority: category_first
+  default_values:
+    global_freight: 8.0
+    category_freight: {}
+estimator:
+  enabled: true
+  version: v1
+  category_first: true
+  keyword_first: true
+  detail_top_k: 30
+  commission_rate_default: 0.14
+  ad_rate_default: 0.05
+  return_loss_rate: 0.03
+  category_purchase_ratio: {}
+  conversion_weights:
+    rating: 0.5
+    reviews: 0.2
+    price_competitiveness: 0.2
+    competition: 0.1
+  confidence_rules:
+    required_fields:
+      - 绿标价
+      - 评级
+      - 跟卖数量
+ai:
+  api_key: sk-844f87f6ca8a4aa0a634059234c86d3c
+  base_url: https://api.deepseek.com
+  model: deepseek-chat
+  max_products: 20
+  prompt_template: '你是一位跨境电商选品专家。请基于以下 Ozon 平台商品数据，生成商业决策分析报告。
+
+
+    ## 数据
+
+    {data}
+
+
+    ## 请按以下结构输出分析（Markdown格式）：
+
+    ### TOP 推荐
+
+    最值得跟卖的 3-5 个商品及具体理由（结合毛利率、销量、竞争度）
+
+
+    ### 风险提示
+
+    高竞争/低毛利/价格异常的商品预警
+
+
+    ### 类目趋势
+
+    各一级类目的销售表现总结
+
+
+    ### 价格策略建议
+
+    基于成本结构的定价优化建议
+
+    '

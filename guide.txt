@@ -1,0 +1,47 @@
+Ozon 选品助手 — 启动指南
+
+=== 本地开发 ===
+
+1. 启动 Clash 俄罗斯节点（HTTP 端口 7890）
+
+2. 启动 Edge（CDP + 代理）
+   pkill -f "Microsoft Edge" 2>/dev/null
+   sleep 2
+   /Applications/Microsoft\ Edge.app/Contents/MacOS/Microsoft\ Edge --remote-debugging-port=9222 --proxy-server=http://127.0.0.1:7890 &
+
+3. 在 Edge 中访问 https://www.ozon.ru/ 确认通过反爬验证
+
+4. 启动 Flask
+   cd /Users/kyrie/Downloads/claude_code_use/ozon_demo
+   source .venv/bin/activate
+   python main.py
+
+5. 浏览器打开 http://127.0.0.1:5001
+   左侧输入类目 URL（如 https://www.ozon.ru/category/smartfony-15502/），点击「爬取」
+
+=== Docker 方式 ===
+
+cd /Users/kyrie/Downloads/claude_code_use/ozon_demo
+
+# 构建并启动
+docker compose up --build -d
+
+# 运行全部测试（34 项：14 E2E + 20 单元）
+docker compose exec app pytest tests/ -v
+
+# 仅运行 E2E 测试
+docker compose exec app pytest tests/test_e2e.py -v
+
+# 查看日志
+docker compose logs -f app
+
+# 停止
+docker compose down
+
+注意：Docker 内使用代理时，config.yaml 中：
+  proxy: http://host.docker.internal:7890
+  cdp_endpoint: http://host.docker.internal:9222
+
+=== 一键启动（可选） ===
+
+pkill -f "Microsoft Edge" 2>/dev/null; sleep 2 && /Applications/Microsoft\ Edge.app/Contents/MacOS/Microsoft\ Edge --remote-debugging-port=9222 --proxy-server=http://127.0.0.1:7890 &>/dev/null & sleep 3 && cd /Users/kyrie/Downloads/claude_code_use/ozon_demo && source .venv/bin/activate && python main.py

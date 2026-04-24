@@ -1,0 +1,7 @@
+version: 1
+success_streak_required: 2
+fields:
+  - 阿里巴巴采购价(预)
+  - 自定义1688运费金额
+  - 毛利率
+  - 展示至下单转化率

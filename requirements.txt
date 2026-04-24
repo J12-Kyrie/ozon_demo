@@ -1,0 +1,12 @@
+flask
+gunicorn
+pandas
+numpy
+pyyaml
+openpyxl
+xlrd
+playwright
+openai
+requests
+pytest
+pytest-asyncio

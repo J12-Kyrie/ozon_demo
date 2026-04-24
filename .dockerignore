@@ -1,0 +1,41 @@
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Tests (not needed in production image)
+tests/
+
+# OMC / Claude Code state
+.omc/
+.claude/
+
+# Git
+.git/
+.gitignore
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Docker files themselves (no need to COPY into image)
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Logs
+*.log
+
+# Excel data files (mounted as volume at runtime)
+*.xls
+*.xlsx

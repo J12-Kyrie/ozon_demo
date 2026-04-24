@@ -1,0 +1,10 @@
+{
+  "active": true,
+  "started_at": "2026-04-24T10:37:52.078Z",
+  "original_prompt": "/oh-my-claudecode:autopilot continue",
+  "session_id": "3cbbeece-c28f-4d43-a315-c46c03cd833b",
+  "project_path": "/Users/kyrie/Downloads/claude_code_use/ozon_demo",
+  "reinforcement_count": 0,
+  "awaiting_confirmation": true,
+  "last_checked_at": "2026-04-24T10:37:52.078Z"
+}
