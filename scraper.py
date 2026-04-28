@@ -195,11 +195,12 @@ async def _start_proxy_tunnel(upstream_url: str):
 
 
 def _extract_page_categories(page_html: str) -> tuple[str | None, str | None]:
-    """Extract category hierarchy from JSON-LD BreadcrumbList in page HTML.
+    """Extract category hierarchy from JSON-LD BreadcrumbList or state-breadCrumbs.
 
-    Returns (category_level1, category_level3) from the first BreadcrumbList found.
-    Falls back to URL path parsing if JSON-LD is absent.
+    Returns (category_level1, category_level3).
+    Tries JSON-LD first, then state-breadCrumbs data-state, then URL path fallback.
     """
+    # Source 1: JSON-LD BreadcrumbList
     for m in re.finditer(
         r'<script[^>]*type="application/ld\+json"[^>]*>(.*?)</script>',
         page_html, re.DOTALL | re.IGNORECASE,
@@ -211,9 +212,26 @@ def _extract_page_categories(page_html: str) -> tuple[str | None, str | None]:
         if isinstance(data, dict) and data.get("@type") == "BreadcrumbList":
             items = data.get("itemListElement", [])
             if len(items) >= 1:
-                level1 = items[0].get("name")
-                level3 = items[-1].get("name") if len(items) > 1 else None
-                return level1, level3
+                return items[0].get("name"), (
+                    items[-1].get("name") if len(items) > 1 else None
+                )
+
+    # Source 2: state-breadCrumbs data-state attribute
+    bc_match = re.search(
+        r'(?:id|data-widget)="[^"]*breadCrumbs[^"]*"[^>]*data-state="([^"]+)"',
+        page_html, re.IGNORECASE,
+    )
+    if bc_match:
+        try:
+            state = json.loads(html_lib.unescape(bc_match.group(1)))
+            crumbs = state.get("breadcrumbs", [])
+            if len(crumbs) >= 1:
+                return crumbs[0].get("text"), (
+                    crumbs[-1].get("text") if len(crumbs) > 1 else None
+                )
+        except (json.JSONDecodeError, TypeError):
+            pass
+
     return None, None
 
 
@@ -254,6 +272,10 @@ async def _extract_products(page, url, config, progress_callback) -> list[dict]:
             f"建议：1) 使用俄罗斯 IP 代理  2) 使用 Demo 模式测试功能"
         )
 
+    # --- Extract page-level categories from first page (before pagination) ---
+    page1_html = html
+    cat_l1, cat_l3 = _extract_page_categories(page1_html)
+
     # --- Scrape pages ---
     for page_num in range(1, max_pages + 1):
         for _ in range(3):
@@ -293,9 +315,7 @@ async def _extract_products(page, url, config, progress_callback) -> list[dict]:
                 await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
                 await page.wait_for_timeout(int(delay_pages * 1000))
 
-    # Inject page-level JSON-LD breadcrumb categories into each card
-    page_html = await page.content()
-    cat_l1, cat_l3 = _extract_page_categories(page_html)
+    # Inject page-level categories (captured from page 1 before pagination)
     if cat_l1 or cat_l3:
         for card in all_products:
             if cat_l1:
@@ -320,16 +340,14 @@ def collect_list_products(cards: list[dict]) -> list[dict]:
 
 
 def extract_detail_fields(page_html: str) -> dict:
-    """Extract key fields from Ozon detail page HTML."""
+    """Extract key fields from Ozon detail page HTML.
+
+    Uses JSON-LD and state-breadCrumbs for categories (not arbitrary <a> tags
+    which pick up unrelated recommendation links).
+    """
     lower = page_html.lower()
-    level1 = None
-    level3 = None
-    breadcrumb = re.findall(r"<a[^>]*>([^<]{1,40})</a>", page_html)
-    if breadcrumb:
-        clean = [b.strip() for b in breadcrumb if b.strip()]
-        if len(clean) >= 2:
-            level1 = clean[0]
-            level3 = clean[-1]
+    # Categories: JSON-LD or state-breadCrumbs only (never random <a> tags)
+    level1, level3 = _extract_page_categories(page_html)
 
     comp = None
     comp_match = re.search(
