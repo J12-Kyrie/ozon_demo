@@ -8,6 +8,7 @@ Supports three scraping modes:
 
 import asyncio
 import base64
+import html as html_lib
 import os
 import json
 import random
@@ -193,6 +194,29 @@ async def _start_proxy_tunnel(upstream_url: str):
 # --------------- shared scraping logic ---------------
 
 
+def _extract_page_categories(page_html: str) -> tuple[str | None, str | None]:
+    """Extract category hierarchy from JSON-LD BreadcrumbList in page HTML.
+
+    Returns (category_level1, category_level3) from the first BreadcrumbList found.
+    Falls back to URL path parsing if JSON-LD is absent.
+    """
+    for m in re.finditer(
+        r'<script[^>]*type="application/ld\+json"[^>]*>(.*?)</script>',
+        page_html, re.DOTALL | re.IGNORECASE,
+    ):
+        try:
+            data = json.loads(html_lib.unescape(m.group(1)))
+        except (json.JSONDecodeError, TypeError):
+            continue
+        if isinstance(data, dict) and data.get("@type") == "BreadcrumbList":
+            items = data.get("itemListElement", [])
+            if len(items) >= 1:
+                level1 = items[0].get("name")
+                level3 = items[-1].get("name") if len(items) > 1 else None
+                return level1, level3
+    return None, None
+
+
 async def _extract_products(page, url, config, progress_callback) -> list[dict]:
     """Navigate to URL, detect blocks, paginate, and extract products.
 
@@ -268,6 +292,16 @@ async def _extract_products(page, url, config, progress_callback) -> list[dict]:
             else:
                 await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
                 await page.wait_for_timeout(int(delay_pages * 1000))
+
+    # Inject page-level JSON-LD breadcrumb categories into each card
+    page_html = await page.content()
+    cat_l1, cat_l3 = _extract_page_categories(page_html)
+    if cat_l1 or cat_l3:
+        for card in all_products:
+            if cat_l1:
+                card["list_category_level1"] = cat_l1
+            if cat_l3:
+                card["list_category_level3"] = cat_l3
 
     return await enrich_products_with_detail(all_products, config, page)
 

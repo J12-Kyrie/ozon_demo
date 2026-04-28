@@ -75,22 +75,45 @@ def _extract_rating_and_reviews(card_html: str):
             if m:
                 return float(m.group(1).replace(",", ".")), None
 
-    # Category page HTML: rating and review count are in separate spans
+    # Category page HTML: rating and review count may be in separate spans
     text = html_lib.unescape(re.sub(r"<[^>]+>", " ", card_html))
     text = re.sub(r"[\s\u2009\xa0]+", " ", text).strip()
 
+    rating = None
+    reviews = None
+
+    # Try adjacent rating+reviews pattern first
     m = re.search(
         r"(?<!\d)([1-5][.,]\d)\s+(\d[\d\s\u2009\xa0]*)\s*"
         r"(?:отзыв(?:ов|а)?|оцен(?:ок|ки)?|review|reviews)?",
         text,
         re.IGNORECASE,
     )
-    if not m:
-        return None, None
+    if m:
+        rating = float(m.group(1).replace(",", "."))
+        reviews_raw = re.sub(r"\D", "", m.group(2))
+        reviews = int(reviews_raw) if reviews_raw else None
 
-    rating = float(m.group(1).replace(",", "."))
-    reviews_raw = re.sub(r"\D", "", m.group(2))
-    reviews = int(reviews_raw) if reviews_raw else None
+    # Standalone rating (no adjacent review count)
+    if rating is None:
+        m = re.search(r"(?<!\d)([1-5][.,]\d)\b", text)
+        if m:
+            r_val = float(m.group(1).replace(",", "."))
+            if 1.0 <= r_val <= 5.0:
+                rating = r_val
+
+    # Standalone review count (Russian: отзыв, отзыва, отзывов)
+    if reviews is None:
+        m = re.search(
+            r"(\d[\d\s\u00a0]*)\s*(?:отзыв|отзыва|отзывов|оцен|review)",
+            text, re.IGNORECASE,
+        )
+        if m:
+            reviews_raw = re.sub(r"\D", "", m.group(1))
+            reviews = int(reviews_raw) if reviews_raw else None
+
+    if rating is None and reviews is None:
+        return None, None
     return rating, reviews
 
 
@@ -272,6 +295,8 @@ def normalize_product(raw: dict) -> dict:
         "成本占比": None,
         "AI智能估算价格": None,
         "商品链接": url,
+        "评论数": raw.get("reviews"),
+        "标题": raw.get("title"),
         "data_quality_flags": quality_flags,
         "data_source": "scraped",
     }
