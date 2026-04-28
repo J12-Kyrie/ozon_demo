@@ -39,12 +39,17 @@ STABLE_STATE_PATH = os.path.join(BASE_DIR, "stable_fields_state.json")
 
 
 def find_excel():
-    """Find the first .xls/.xlsx in BASE_DIR."""
+    """Find the most recent .xls/.xlsx in BASE_DIR. Prefers merged data."""
+    candidates = []
     for pattern in ("*.xls", "*.xlsx"):
-        files = glob.glob(os.path.join(BASE_DIR, pattern))
-        if files:
-            return files[0]
-    return None
+        candidates.extend(glob.glob(os.path.join(BASE_DIR, pattern)))
+    if not candidates:
+        return None
+    # Prefer scraped_merged.xlsx if it exists, otherwise newest file
+    merged = os.path.join(BASE_DIR, "scraped_merged.xlsx")
+    if merged in candidates:
+        return merged
+    return max(candidates, key=os.path.getmtime)
 
 
 def load_data():
