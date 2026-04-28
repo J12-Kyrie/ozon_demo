@@ -101,6 +101,15 @@ TAB_COST_COLS = [
     "成本占比",
     "毛利率",
     "利润(预)",
+    # _est fallback columns
+    "月销量_est",
+    "月销售额_est",
+    "毛利率_est",
+    "总成本_est",
+    "利润_est",
+    "平台佣金_est",
+    "ozon物流费_est",
+    "成本占比_est",
 ]
 
 ALL_DATA_COLS = list(dict.fromkeys(TAB_BASIC_COLS + TAB_TRAFFIC_COLS + TAB_COST_COLS))
