@@ -16,12 +16,26 @@ class TestParseProductCard:
         assert result["sku_id"] == "3340449279"
         assert "Foundation Liquid Concealer" in result["title"]
         assert result["price"] == 162.0
-        assert result["original_price"] == 199.0
+        # Fixture has no <s>, <del>, or strikethrough class → no original_price
+        assert result["original_price"] is None
         assert result["rating"] == 3.7
         assert result["reviews"] == 42
         assert result["seller"] == "NorthVoyage"
         assert "/product/" in result["url"]
         assert "3340449279" in result["url"]
+
+    def test_extracts_original_price_with_strikethrough(self):
+        html = """
+        <div class="tile-root">
+          <a href="/product/test-12345/"><span>Test Title Here OK</span></a>
+          <span class="tsHeadline500Medium">100 ₽</span>
+          <span class="tsBodyControl400Small" style="text-decoration:line-through">150 ₽</span>
+          <span>4.5 99 </span>
+        </div>
+        """
+        result = parse_product_card(html)
+        assert result["price"] == 100.0
+        assert result["original_price"] == 150.0
 
     def test_missing_fields_returns_none(self, sample_product_card_missing_fields):
         result = parse_product_card(sample_product_card_missing_fields)

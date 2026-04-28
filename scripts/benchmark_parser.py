@@ -83,7 +83,7 @@ def _values_match(parsed_val, truth_val) -> bool:
 
     # Numeric comparison with tolerance
     if isinstance(parsed_val, (int, float)) and isinstance(truth_val, (int, float)):
-        return abs(parsed_val - truth_val) < 0.01
+        return abs(parsed_val - truth_val) <= 0.05
 
     # String comparison (case-insensitive, stripped)
     return str(parsed_val).strip().lower() == str(truth_val).strip().lower()

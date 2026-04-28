@@ -2,6 +2,7 @@
 
 import re
 import math
+import html as html_lib
 from html.parser import HTMLParser
 
 
@@ -15,6 +16,82 @@ def _extract_number(text):
     if m:
         return float(m.group().replace(",", "."))
     return None
+
+
+_PRICE_RE = r"([\d\s\u2009\xa0]+)\s*₽"
+_ORIGINAL_PRICE_MARKER_RE = re.compile(
+    r"(?:price[_-]?original|original[_-]?price|old[_-]?price|"
+    r"oldPrice|originalPrice|strikethrough|line-through|textOriginalprice)",
+    re.IGNORECASE,
+)
+
+
+def _extract_price_from_fragment(fragment: str):
+    m = re.search(_PRICE_RE, fragment)
+    if not m:
+        return None
+    num = _extract_number(m.group(1))
+    return num if num and num > 1 else None
+
+
+def _extract_original_price(card_html: str):
+    # Check for <s> or <del> tags containing a price
+    for m in re.finditer(r"(?is)<(?:s|del)\b[^>]*>.*?</(?:s|del)>", card_html):
+        price = _extract_price_from_fragment(m.group(0))
+        if price:
+            return price
+
+    # For each ₽ price found, check surrounding context for strikethrough markers
+    for pm in re.finditer(_PRICE_RE, card_html):
+        # Look at 200 chars before this price for strikethrough/line-through signals
+        ctx_start = max(0, pm.start() - 200)
+        ctx = card_html[ctx_start:pm.end()]
+        if _ORIGINAL_PRICE_MARKER_RE.search(ctx) or re.search(
+            r"(?i)text-decoration\s*:\s*line-through|line-through", ctx
+        ):
+            price = _extract_price_from_fragment(pm.group(0))
+            if price:
+                return price
+
+    return None
+
+
+def _extract_rating_and_reviews(card_html: str):
+    # data-rating / data-value attributes (future-proof, may appear in later layouts)
+    m = re.search(r"""(?is)\bdata-rating=["']([1-5](?:[.,]\d{1,4})?)["']""", card_html)
+    if m:
+        return float(m.group(1).replace(",", ".")), None
+
+    m = re.search(
+        r"""(?is)<[^>]*(?:rating|star|review|comment)[^>]*\bdata-value=["']([1-5](?:[.,]\d{1,4})?)["'][^>]*>""",
+        card_html,
+    )
+    if m:
+        return float(m.group(1).replace(",", ".")), None
+
+    for label in re.findall(r"""(?is)\baria-label=["']([^"']+)["']""", card_html):
+        if re.search(r"(?i)rating|рейтинг|зв[её]зд", label):
+            m = re.search(r"([1-5](?:[.,]\d{1,4})?)", label)
+            if m:
+                return float(m.group(1).replace(",", ".")), None
+
+    # Category page HTML: rating and review count are in separate spans
+    text = html_lib.unescape(re.sub(r"<[^>]+>", " ", card_html))
+    text = re.sub(r"[\s\u2009\xa0]+", " ", text).strip()
+
+    m = re.search(
+        r"(?<!\d)([1-5][.,]\d)\s+(\d[\d\s\u2009\xa0]*)\s*"
+        r"(?:отзыв(?:ов|а)?|оцен(?:ок|ки)?|review|reviews)?",
+        text,
+        re.IGNORECASE,
+    )
+    if not m:
+        return None, None
+
+    rating = float(m.group(1).replace(",", "."))
+    reviews_raw = re.sub(r"\D", "", m.group(2))
+    reviews = int(reviews_raw) if reviews_raw else None
+    return rating, reviews
 
 
 def parse_product_card(html: str) -> dict:
@@ -62,25 +139,13 @@ def parse_product_card(html: str) -> dict:
             prices.append(num)
 
     price = prices[0] if prices else None
-    original_price = prices[1] if len(prices) > 1 else None
+    original_price = _extract_original_price(html)
 
     # --- Rating & Reviews ---
-    # Pattern: rating (like "4.8") followed by review count (like "130")
-    # These typically appear as adjacent text nodes
-    rating = None
-    reviews = None
-
-    # Strip HTML tags to get visible text
-    text_only = re.sub(r"<[^>]+>", " ", html)
-    text_only = re.sub(r"\s+", " ", text_only)
-
-    # Look for rating pattern: X.X followed by a number (reviews)
-    rating_match = re.search(r"(\d\.\d)\s+(\d+)\s", text_only)
-    if rating_match:
-        r_val = float(rating_match.group(1))
-        if 1.0 <= r_val <= 5.0:
-            rating = r_val
-            reviews = int(rating_match.group(2))
+    rating, reviews = _extract_rating_and_reviews(html)
+    # Validate rating range on the extracted result
+    if rating is not None and not (1.0 <= rating <= 5.0):
+        rating = None
 
     # --- Seller ---
     seller = None
