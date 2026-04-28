@@ -101,18 +101,28 @@ TAB_COST_COLS = [
     "成本占比",
     "毛利率",
     "利润(预)",
-    # _est fallback columns
-    "月销量_est",
-    "月销售额_est",
-    "毛利率_est",
-    "总成本_est",
-    "利润_est",
-    "平台佣金_est",
-    "ozon物流费_est",
-    "成本占比_est",
 ]
 
-ALL_DATA_COLS = list(dict.fromkeys(TAB_BASIC_COLS + TAB_TRAFFIC_COLS + TAB_COST_COLS))
+EST_DATA_COLS = [
+    "阿里巴巴采购价(预)_est",
+    "自定义1688运费金额_est",
+    "ozon物流费(预)_est",
+    "平台佣金(预)_est",
+    "佣金比例%_est",
+    "总成本_est",
+    "成本占比_est",
+    "利润(预)_est",
+    "毛利率_est",
+    "月销量_est",
+    "月销售额_est",
+    "展示至下单转化率_est",
+    "estimate_confidence",
+    "estimate_version",
+]
+
+ALL_DATA_COLS = list(
+    dict.fromkeys(TAB_BASIC_COLS + TAB_TRAFFIC_COLS + TAB_COST_COLS + EST_DATA_COLS)
+)
 
 
 def load_config():
@@ -243,10 +253,16 @@ def apply_filters(cfg, df):
     """Apply config filters to df, returning (filtered_df, total_before). Does not score."""
     df = df.copy()
     f = cfg["filters"]
-    df = df[_safe_filter(df["月销量"], ">=", f["min_monthly_sales"])]
-    df = df[_safe_filter(df["毛利率"], ">=", f["min_gross_margin"])]
+    df = df[_safe_filter(_with_est_fallback(df, "月销量"), ">=", f["min_monthly_sales"])]
+    df = df[_safe_filter(_with_est_fallback(df, "毛利率"), ">=", f["min_gross_margin"])]
     df = df[_safe_filter(df["跟卖数量"], "<=", f["max_competitors"])]
-    df = df[_safe_filter(df["阿里巴巴采购价(预)"], "<=", f["max_purchase_price"])]
+    df = df[
+        _safe_filter(
+            _with_est_fallback(df, "阿里巴巴采购价(预)"),
+            "<=",
+            f["max_purchase_price"],
+        )
+    ]
     df = df[_safe_filter(df["绿标价"], ">=", f["min_selling_price"])]
     if f.get("categories"):
         df = df[df["一级类目"].isna() | df["一级类目"].isin(f["categories"])]
@@ -311,11 +327,11 @@ def filter_and_score(cfg, df=None):
         "total_before": total_before,
         "total_after": total_after,
         "shown": len(df),
-        "avg_margin": round(df["毛利率"].dropna().mean(), 1)
-        if df["毛利率"].dropna().any()
+        "avg_margin": round(margin_s.dropna().mean(), 1)
+        if margin_s.dropna().any()
         else 0,
-        "avg_sales": round(df["月销量"].dropna().mean(), 1)
-        if df["月销量"].dropna().any()
+        "avg_sales": round(sales_s.dropna().mean(), 1)
+        if sales_s.dropna().any()
         else 0,
         "avg_score": round(df["综合评分"].mean(), 1) if not df.empty else 0,
     }
@@ -534,9 +550,11 @@ def api_dashboard_data():
 
     scatter = []
     if not df.empty and "毛利率" in df.columns and "月销量" in df.columns:
-        for _, row in df.iterrows():
-            margin = row.get("毛利率")
-            sales = row.get("月销量")
+        margin_series = _with_est_fallback(df, "毛利率")
+        sales_series = _with_est_fallback(df, "月销量")
+        for idx, row in df.iterrows():
+            margin = margin_series.loc[idx]
+            sales = sales_series.loc[idx]
             if margin is not None and sales is not None:
                 scatter.append(
                     {

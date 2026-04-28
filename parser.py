@@ -248,6 +248,10 @@ def normalize_product(raw: dict) -> dict:
         raw.get("跟卖数量"),
         raw.get("list_competitor_count"),
     )
+    brand = first_non_null(raw.get("detail_brand"), raw.get("品牌"), raw.get("brand"))
+    store_name = first_non_null(
+        raw.get("detail_store_name"), raw.get("seller"), raw.get("店铺名称")
+    )
     monthly_sales = _parse_sales_hint(
         first_non_null(
             raw.get("detail_monthly_sales"),
@@ -262,11 +266,11 @@ def normalize_product(raw: dict) -> dict:
         "评级": raw.get("rating"),
         "黑标价": raw.get("original_price"),
         "绿标价": raw.get("price"),
-        "品牌": None,
+        "品牌": brand,
         "一级类目": category1,
         "三级类目": category3,
-        "店铺Id": None,
-        "店铺名称": raw.get("seller"),
+        "店铺Id": first_non_null(raw.get("detail_store_id"), raw.get("店铺Id")),
+        "店铺名称": store_name,
         "月销量": monthly_sales,
         "月销售额": None,
         "销售动态占比": None,
@@ -277,9 +281,11 @@ def normalize_product(raw: dict) -> dict:
         "搜索至加入购物车转化率": None,
         "详情页访问量": None,
         "曝光次数": None,
-        "配送方式": None,
-        "重量（克）": None,
-        "长*宽*高(mm)": None,
+        "配送方式": first_non_null(raw.get("detail_delivery_method"), raw.get("配送方式")),
+        "重量（克）": first_non_null(raw.get("detail_weight_grams"), raw.get("重量（克）")),
+        "长*宽*高(mm)": first_non_null(
+            raw.get("detail_dimensions_mm"), raw.get("长*宽*高(mm)")
+        ),
         "跟卖数量": competitors,
         "最低跟卖价(绿标价)": None,
         "最低跟卖价(黑标价)": None,

@@ -16,7 +16,7 @@ scraper:
   mode: cdp
   cdp_endpoint: http://127.0.0.1:9222
   detail_enrich_enabled: true
-  detail_top_k: 30
+  detail_top_k: 150
   detail_timeout: 30
   detail_concurrency: 3
   delay_between_pages: 3.0
@@ -33,6 +33,7 @@ supplier1688:
   fetch_fields:
     - purchase_price
     - freight_est
+  live_scrape_enabled: false
   mapping_file: supplier_mapping.csv
   mapping_priority: keyword_first
   slider_strategy: manual_intervention
@@ -43,14 +44,29 @@ supplier1688:
     category_freight: {}
 estimator:
   enabled: true
-  version: v1
+  version: v2
   category_first: true
   keyword_first: true
-  detail_top_k: 30
   commission_rate_default: 0.14
   ad_rate_default: 0.05
   return_loss_rate: 0.03
+  purchase_ratio_default: 0.35
+  supplier_freight_default: 8.0
+  cny_to_rub_rate: 12.0
+  ozon_logistics_base_default: 180.0
+  ozon_logistics_per_kg_default: 60.0
+  default_chargeable_weight_kg: 0.3
+  volumetric_divisor: 5000
+  review_to_monthly_sales_rate_default: 0.35
+  monthly_sales_est_cap: 5000
   category_purchase_ratio: {}
+  category_review_to_sales_rate: {}
+  category_commission_rates:
+    Электроника: 0.1
+    Бытовая техника: 0.12
+    Одежда: 0.15
+    Красота: 0.13
+    Товары для дома: 0.13
   conversion_weights:
     rating: 0.5
     reviews: 0.2
@@ -60,6 +76,7 @@ estimator:
     required_fields:
       - 绿标价
       - 评级
+      - 评论数
       - 跟卖数量
 ai:
   api_key: sk-844f87f6ca8a4aa0a634059234c86d3c

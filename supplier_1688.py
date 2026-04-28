@@ -15,6 +15,7 @@ import os
 import re
 import logging
 from dataclasses import dataclass
+from urllib.parse import quote_plus
 import pandas as pd
 
 log = logging.getLogger(__name__)
@@ -43,7 +44,10 @@ def _extract_1688_number(text: str, pattern: re.Pattern) -> float | None:
 
 
 async def scrape_1688_product(keyword: str, config: dict) -> dict | None:
-    """Scrape 1688 search result page for a product matching keyword.
+    """Scrape 1688 search for a product matching keyword.
+
+    1688 search requires login — use CDP mode (connect to user's real browser
+    where they are already logged in) or fall back to estimator ratios.
 
     Returns dict with keys: purchase_price, freight_est, status
     or None if scraping fails entirely.
@@ -54,33 +58,44 @@ async def scrape_1688_product(keyword: str, config: dict) -> dict | None:
         log.warning("Playwright not available for 1688 scraping")
         return None
 
-    keyword_enc = keyword.replace(" ", "+")
+    keyword_enc = quote_plus(keyword)
     search_url = (
         f"https://s.1688.com/selloffer/offer_search.htm?keywords={keyword_enc}"
     )
     timeout_ms = int(config.get("timeout", 30)) * 1000
+    mode = config.get("1688_mode", "playwright")
 
     try:
         async with async_playwright() as p:
-            browser = await p.chromium.launch(
-                headless=True,
-                args=["--no-sandbox", "--disable-gpu"],
-            )
-            try:
-                context = await browser.new_context(
-                    viewport={"width": 1280, "height": 800},
-                    locale="zh-CN",
+            if mode == "cdp":
+                cdp_endpoint = config.get("1688_cdp_endpoint", "http://127.0.0.1:9222")
+                browser = await p.chromium.connect_over_cdp(cdp_endpoint)
+                ctx = browser.contexts[0] if browser.contexts else await browser.new_context()
+                close_browser = False
+            else:
+                browser = await p.chromium.launch(
+                    headless=True, args=["--no-sandbox", "--disable-gpu"]
                 )
-                page = await context.new_page()
+                ctx = await browser.new_context(
+                    viewport={"width": 1280, "height": 800}, locale="zh-CN"
+                )
+                close_browser = True
+
+            try:
+                page = await ctx.new_page()
                 page.set_default_timeout(timeout_ms)
 
-                # Navigate to search results
                 resp = await page.goto(search_url, wait_until="domcontentloaded")
                 if resp and resp.status >= 400:
-                    log.warning("1688 search returned HTTP %d for %s", resp.status, keyword)
+                    log.warning("1688 search HTTP %d for '%s'", resp.status, keyword)
                     return None
 
                 await page.wait_for_timeout(3000)
+
+                # Detect login wall
+                if "login.taobao.com" in page.url or "login.1688.com" in page.url:
+                    log.info("1688 login wall — use CDP mode (1688_mode: cdp) with logged-in browser")
+                    return {"status": "login_required"}
 
                 # Get the first product link from search results
                 first_link = await page.query_selector(
@@ -88,26 +103,20 @@ async def scrape_1688_product(keyword: str, config: dict) -> dict | None:
                 )
                 if not first_link:
                     log.info("No 1688 results for keyword: %s", keyword)
-                    return None
+                    return {"status": "no_results"}
 
                 href = await first_link.get_attribute("href")
                 if not href:
-                    return None
+                    return {"status": "no_href"}
 
-                # Navigate to detail page
                 if not href.startswith("http"):
                     href = f"https:{href}" if href.startswith("//") else f"https://detail.1688.com{href}"
                 await page.goto(href, wait_until="domcontentloaded")
                 await page.wait_for_timeout(2000)
 
                 text = await page.content()
-
-                # Extract fields from the combined page text
                 purchase_price = _extract_1688_number(text, _1688_PRICE_RE)
                 freight_est = _extract_1688_number(text, _1688_FREIGHT_RE)
-
-                await page.close()
-                await context.close()
 
                 if purchase_price is None:
                     return {"status": "price_not_found"}
@@ -119,7 +128,9 @@ async def scrape_1688_product(keyword: str, config: dict) -> dict | None:
                 }
 
             finally:
-                await browser.close()
+                await page.close()
+                if close_browser:
+                    await browser.close()
 
     except Exception as e:
         log.warning("1688 scrape failed for '%s': %s", keyword, e)
@@ -217,9 +228,11 @@ def fetch_supplier_fields(mapped_item: dict, cfg: dict) -> dict:
     purchase_price = mapped_item.get("purchase_price")
     freight_est = mapped_item.get("freight_est")
 
-    # Attempt live 1688 scraping if CSV has no purchase_price
+    # Attempt live 1688 scraping only when explicitly enabled. 1688 often needs
+    # a logged-in China network/browser session, so deterministic CSV/defaults
+    # are the safe baseline.
     keyword = mapped_item.get("supplier_keyword", "")
-    if purchase_price is None and keyword and cfg.get("live_scrape_enabled", True):
+    if purchase_price is None and keyword and cfg.get("live_scrape_enabled", False):
         log.info("Attempting live 1688 scrape for keyword: %s", keyword)
         scraped = scrape_1688_sync(keyword, cfg)
         if scraped and scraped.get("status") == "ok":
@@ -260,9 +273,9 @@ def enrich_products_with_supplier(
 ) -> tuple[list[dict], dict]:
     """Best-effort enrichment using mapping + defaults.
 
-    No live crawl is performed in this minimal implementation; it prepares
-    deterministic supplier fields from mapping/default values and marks
-    manual_required when category keyword does not match.
+    Live crawling is opt-in via supplier1688.live_scrape_enabled. The default
+    path prepares deterministic supplier fields from mapping/default values and
+    marks manual_required when category keyword does not match.
     """
     supplier_cfg = config.get("supplier1688", {})
     if not supplier_cfg.get("enabled", False):

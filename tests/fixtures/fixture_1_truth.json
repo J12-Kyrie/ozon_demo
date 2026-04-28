@@ -1,5 +1,322 @@
 [
-  {"sku_id": "3340449279", "title": "Foundation Liquid Concealer 30ml Premium", "price_current": 162.0, "price_original": 199.0, "rating": 3.7, "seller": "NorthVoyage"},
-  {"sku_id": "5555555555", "title": "Smartphone Case Ultra Thin Cover", "price_current": 89.0, "price_original": null, "rating": 4.8, "seller": "TopGoods"},
-  {"sku_id": "7777777777", "title": "Wireless Bluetooth Headphones Pro Max Ultra", "price_current": 450.0, "price_original": 599.0, "rating": 4.2, "seller": "BestShop"}
+  {
+    "sku_id": "3724894384",
+    "title": "vivo Смартфон v70 Ростест (EAC) 8/256 ГБ, черный",
+    "price_current": 30985,
+    "price_original": null,
+    "rating": 4.929,
+    "seller": null
+  },
+  {
+    "sku_id": "2811310229",
+    "title": "Xiaomi Смартфон Redmi 15 Ростест (EAC) 8/256 ГБ, черный",
+    "price_current": 16820,
+    "price_original": null,
+    "rating": 4.915,
+    "seller": null
+  },
+  {
+    "sku_id": "3635609860",
+    "title": "realme Смартфон P4 Power Ростест (EAC) 8/256 ГБ, оранжевый",
+    "price_current": 29690,
+    "price_original": null,
+    "rating": null,
+    "seller": null
+  },
+  {
+    "sku_id": "3330515022",
+    "title": "XIAOXING Смартфон 8/512 ГБ, черный",
+    "price_current": 5101,
+    "price_original": null,
+    "rating": 4.7255,
+    "seller": null
+  },
+  {
+    "sku_id": "3370591246",
+    "title": "Xiaomi Смартфон REDMI Note 15 Ростест (EAC) 8/128 ГБ, черный",
+    "price_current": 17887,
+    "price_original": null,
+    "rating": 4.945,
+    "seller": null
+  },
+  {
+    "sku_id": "2657125956",
+    "title": "Samsung Смартфон Galaxy A07 Ростест (EAC) 6/128 ГБ, черный",
+    "price_current": 10781,
+    "price_original": null,
+    "rating": 4.93,
+    "seller": null
+  },
+  {
+    "sku_id": "3378425390",
+    "title": "W&O Смартфон WO1 Ростест (EAC) 12/512 ГБ, черный матовый",
+    "price_current": 34205,
+    "price_original": null,
+    "rating": 4.5161,
+    "seller": null
+  },
+  {
+    "sku_id": "3694876086",
+    "title": "Смартфон I16pro 16/1 ТБ, черный матовый",
+    "price_current": 5099,
+    "price_original": null,
+    "rating": 4.5132,
+    "seller": null
+  },
+  {
+    "sku_id": "1998926953",
+    "title": "Xiaomi Смартфон Redmi A5 Ростест (EAC) 4/128 ГБ, черный",
+    "price_current": 8900,
+    "price_original": null,
+    "rating": 4.927,
+    "seller": null
+  },
+  {
+    "sku_id": "2811310190",
+    "title": "Xiaomi Смартфон Redmi 15 Ростест (EAC) 8/256 ГБ, серый",
+    "price_current": 16820,
+    "price_original": null,
+    "rating": 4.915,
+    "seller": null
+  },
+  {
+    "sku_id": "3635609840",
+    "title": "realme Смартфон P4 Power Ростест (EAC) 8/256 ГБ, серебристый",
+    "price_current": 29690,
+    "price_original": null,
+    "rating": null,
+    "seller": null
+  },
+  {
+    "sku_id": "3370561606",
+    "title": "Xiaomi Смартфон REDMI Note 15 Ростест (EAC) 8/256 ГБ, фиолетовый",
+    "price_current": 19947,
+    "price_original": null,
+    "rating": 4.945,
+    "seller": null
+  },
+  {
+    "sku_id": "2214834452",
+    "title": "realme Смартфон realme С71 Ростест (EAC) 8/128 ГБ, зеленый, темно-зеленый",
+    "price_current": 12002,
+    "price_original": null,
+    "rating": 4.91,
+    "seller": null
+  },
+  {
+    "sku_id": "3376692950",
+    "title": "Rikor Смартфон NEURO S3 Ростест (EAC) 6/128 ГБ, черный, черный матовый",
+    "price_current": 15614,
+    "price_original": null,
+    "rating": 4.898,
+    "seller": null
+  },
+  {
+    "sku_id": "3028373569",
+    "title": "realme Смартфон realme Note 70 Ростест (EAC) 6/128 ГБ, черный",
+    "price_current": 9906,
+    "price_original": null,
+    "rating": 4.97,
+    "seller": null
+  },
+  {
+    "sku_id": "3349676207",
+    "title": "Samsung Смартфон Galaxy A17 8/256 ГБ, черный",
+    "price_current": null,
+    "price_original": null,
+    "rating": 4.9537,
+    "seller": null
+  },
+  {
+    "sku_id": "2944013706",
+    "title": "vivo Смартфон Y29 Ростест (EAC) 8/128 ГБ, коричневый",
+    "price_current": 9757,
+    "price_original": null,
+    "rating": 4.93,
+    "seller": null
+  },
+  {
+    "sku_id": "3111378432",
+    "title": "Смартфон I15 Pro Max, В качестве подарка родным и близким Ростест (EAC) 12/512 ГБ, черный",
+    "price_current": 6290,
+    "price_original": null,
+    "rating": 4.41,
+    "seller": null
+  },
+  {
+    "sku_id": "3230123837",
+    "title": "OPPO Смартфон Reno15 F 5G Ростест (EAC) 8/256 ГБ, синий, темно-синий",
+    "price_current": 25442,
+    "price_original": null,
+    "rating": 4.9709,
+    "seller": null
+  },
+  {
+    "sku_id": "2712670469",
+    "title": "Samsung Смартфон Galaxy A17 Global 8/256 ГБ, синий",
+    "price_current": 14168,
+    "price_original": null,
+    "rating": 4.9401,
+    "seller": null
+  },
+  {
+    "sku_id": "3832168590",
+    "title": "Смартфон HUAVEI nova 13 Российская версия:nova 13 Ростест (EAC) телефон ,Смартфон русской версии, быструю зарядки, глобальная версия,подарок для детей и родителям Global EU 12/512 ГБ, темно-синий",
+    "price_current": 5916,
+    "price_original": null,
+    "rating": 4.9382,
+    "seller": null
+  },
+  {
+    "sku_id": "2811310187",
+    "title": "Xiaomi Смартфон Redmi 15 Ростест (EAC) 8/256 ГБ, сиреневый",
+    "price_current": 16820,
+    "price_original": null,
+    "rating": 4.915,
+    "seller": null
+  },
+  {
+    "sku_id": "3015990483",
+    "title": "Samsung Смартфон Galaxy A06 SM-A065F  Ростест (EAC) 4/64 ГБ, золотой",
+    "price_current": 8092,
+    "price_original": null,
+    "rating": 4.875,
+    "seller": null
+  },
+  {
+    "sku_id": "2888374772",
+    "title": "OPPO Смартфон OPPO A6 Pro Ростест (EAC) 8/256 ГБ, серый металлик, серый",
+    "price_current": 17846,
+    "price_original": null,
+    "rating": 4.91,
+    "seller": null
+  },
+  {
+    "sku_id": "3032311833",
+    "title": "realme Смартфон realme P3 Lite Ростест (EAC) 4/128 ГБ, зеленый",
+    "price_current": 9321,
+    "price_original": null,
+    "rating": 4.9109,
+    "seller": null
+  },
+  {
+    "sku_id": "2811310324",
+    "title": "Xiaomi Смартфон Redmi 15 Ростест (EAC) 6/128 ГБ, черный",
+    "price_current": 13850,
+    "price_original": null,
+    "rating": 4.915,
+    "seller": null
+  },
+  {
+    "sku_id": "3524054699",
+    "title": "Infinix Смартфон Note 60 Pro Ростест (EAC) 12/256 ГБ, серый металлик",
+    "price_current": 33999,
+    "price_original": null,
+    "rating": 4.9289,
+    "seller": null
+  },
+  {
+    "sku_id": "3366774480",
+    "title": "Samsung Смартфон Samsung Galaxy A55 5G Global 8/256 ГБ, темно-синий",
+    "price_current": 31093,
+    "price_original": null,
+    "rating": 4.9392,
+    "seller": null
+  },
+  {
+    "sku_id": "3412525451",
+    "title": "Redmi Смартфон Global 8/256 ГБ, оливковый, темно-зеленый",
+    "price_current": 7286,
+    "price_original": null,
+    "rating": 4.73,
+    "seller": null
+  },
+  {
+    "sku_id": "3356314542",
+    "title": "Xiaomi Смартфон REDMI Note 15 Pro Ростест (EAC) 8/256 ГБ, черный",
+    "price_current": 25028,
+    "price_original": null,
+    "rating": 4.9945,
+    "seller": null
+  },
+  {
+    "sku_id": "2713026190",
+    "title": "Honor Смартфон 400 lite Ростест (EAC) 8/256 ГБ, черный",
+    "price_current": 21215,
+    "price_original": null,
+    "rating": null,
+    "seller": null
+  },
+  {
+    "sku_id": "1998926903",
+    "title": "Xiaomi Смартфон Redmi A5 Ростест (EAC) 4/128 ГБ, голубой",
+    "price_current": 8900,
+    "price_original": null,
+    "rating": 4.927,
+    "seller": null
+  },
+  {
+    "sku_id": "3545303435",
+    "title": "Samsung Смартфон Galaxy S26 Ultra Global 12/256 ГБ, черный",
+    "price_current": 82962,
+    "price_original": null,
+    "rating": 4.9494,
+    "seller": null
+  },
+  {
+    "sku_id": "1969919922",
+    "title": "Samsung Смартфон Galaxy A35 Global 8/128 ГБ, фиолетовый",
+    "price_current": 16221,
+    "price_original": null,
+    "rating": 4.9813,
+    "seller": null
+  },
+  {
+    "sku_id": "3524054599",
+    "title": "Infinix Смартфон Note 60 Pro Ростест (EAC) 8/256 ГБ, темно-синий",
+    "price_current": 30999,
+    "price_original": null,
+    "rating": 4.9289,
+    "seller": null
+  },
+  {
+    "sku_id": "3158527720",
+    "title": "Infinix Смартфон HOT 60i X6728 8/256 ГБ, черный",
+    "price_current": 13629,
+    "price_original": null,
+    "rating": 4.9117,
+    "seller": null
+  },
+  {
+    "sku_id": "3042492822",
+    "title": "realme Смартфон P3 Lite Ростест (EAC) 4/128 ГБ, зеленый",
+    "price_current": 7919,
+    "price_original": null,
+    "rating": 4.92,
+    "seller": null
+  },
+  {
+    "sku_id": "2186959742",
+    "title": "iQOO Смартфон Neo 10 Ростест (EAC) 8/256 ГБ, оранжевый",
+    "price_current": 31184,
+    "price_original": null,
+    "rating": 4.97,
+    "seller": null
+  },
+  {
+    "sku_id": "2323309903",
+    "title": "realme Смартфон realme P3 Ростест (EAC) 8/256 ГБ, шоколадный, черно-серый",
+    "price_current": 22533,
+    "price_original": null,
+    "rating": 4.9373,
+    "seller": null
+  },
+  {
+    "sku_id": "2804143252",
+    "title": "Samsung Смартфон Galaxy A17 Ростест (EAC) 4/128 ГБ, серый",
+    "price_current": 13650,
+    "price_original": null,
+    "rating": 4.93,
+    "seller": null
+  }
 ]

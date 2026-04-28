@@ -339,35 +339,110 @@ def collect_list_products(cards: list[dict]) -> list[dict]:
     return result
 
 
+def _detail_text(page_html: str) -> str:
+    text = html_lib.unescape(re.sub(r"<[^>]+>", " ", page_html))
+    return re.sub(r"[\s\u2009\xa0]+", " ", text).strip()
+
+
+def _extract_detail_competitor_count(text: str) -> int | None:
+    patterns = [
+        r"(?:другие\s+продавцы|продавц\w*|предложени\w*|sellers?|offers?)[^\d]{0,40}(\d{1,4})",
+        r"(\d{1,4})\s*(?:продавц\w*|предложени\w*|sellers?|offers?)",
+    ]
+    for pattern in patterns:
+        m = re.search(pattern, text, re.IGNORECASE)
+        if not m:
+            continue
+        value = int(m.group(1))
+        if 0 <= value <= 500:
+            return value
+    return None
+
+
+def _extract_detail_label(text: str, labels: list[str]) -> str | None:
+    stop = (
+        r"Бренд|Цвет|Тип|Модель|Продавец|Магазин|Вес|Размер|Габарит|"
+        r"Длина|Ширина|Высота|Артикул|Характеристики|Описание"
+    )
+    for label in labels:
+        m = re.search(
+            rf"{label}\s*[:\-]?\s*([A-Za-zА-Яа-яЁё0-9][A-Za-zА-Яа-яЁё0-9 .,&'\"/+\-]{{1,80}}?)(?=\s+(?:{stop})\b|$)",
+            text,
+            re.IGNORECASE,
+        )
+        if m:
+            value = m.group(1).strip(" :-")
+            if value:
+                return value[:80]
+    return None
+
+
+def _extract_weight_grams(text: str) -> int | None:
+    m = re.search(
+        r"(?:Вес(?: товара| с упаковкой)?)[^\d]{0,30}(\d+(?:[.,]\d+)?)\s*(кг|kg|г|g)\b",
+        text,
+        re.IGNORECASE,
+    )
+    if not m:
+        return None
+    value = float(m.group(1).replace(",", "."))
+    unit = m.group(2).lower()
+    grams = value * 1000 if unit in ("кг", "kg") else value
+    return int(round(grams))
+
+
+def _extract_dimensions_mm(text: str) -> str | None:
+    m = re.search(
+        r"(\d+(?:[.,]\d+)?)\s*[xх×*]\s*(\d+(?:[.,]\d+)?)\s*[xх×*]\s*(\d+(?:[.,]\d+)?)\s*(см|cm|мм|mm)\b",
+        text,
+        re.IGNORECASE,
+    )
+    if not m:
+        return None
+    values = [float(m.group(i).replace(",", ".")) for i in (1, 2, 3)]
+    unit = m.group(4).lower()
+    if unit in ("см", "cm"):
+        values = [v * 10 for v in values]
+    return "*".join(str(int(round(v))) for v in values)
+
+
 def extract_detail_fields(page_html: str) -> dict:
     """Extract key fields from Ozon detail page HTML.
 
     Uses JSON-LD and state-breadCrumbs for categories (not arbitrary <a> tags
     which pick up unrelated recommendation links).
     """
-    lower = page_html.lower()
+    text = _detail_text(page_html)
     # Categories: JSON-LD or state-breadCrumbs only (never random <a> tags)
     level1, level3 = _extract_page_categories(page_html)
 
-    comp = None
-    comp_match = re.search(
-        r"(?:跟卖|продавц|sellers?)[^\d]{0,8}(\d+)", lower, re.IGNORECASE
-    )
-    if comp_match:
-        comp = int(comp_match.group(1))
+    comp = _extract_detail_competitor_count(text)
 
     sales_hint = None
     sales_match = re.search(
-        r"(?:月销|购买|sold)[^\d]{0,8}(\d+)", page_html, re.IGNORECASE
+        r"(?:月销|购买|sold|sales)[^\d]{0,12}(\d+)", text, re.IGNORECASE
     )
     if sales_match:
         sales_hint = int(sales_match.group(1))
+
+    seller_id = None
+    seller_match = re.search(
+        r"(?:sellerId|seller_id|companyId)[\"':=\s]+(\d{3,})", page_html, re.IGNORECASE
+    )
+    if seller_match:
+        seller_id = int(seller_match.group(1))
 
     return {
         "detail_category_level1": level1,
         "detail_category_level3": level3,
         "detail_competitor_count": comp,
         "detail_monthly_sales": sales_hint,
+        "detail_brand": _extract_detail_label(text, ["Бренд", "Brand"]),
+        "detail_store_name": _extract_detail_label(text, ["Продавец", "Магазин"]),
+        "detail_store_id": seller_id,
+        "detail_delivery_method": "Ozon" if re.search(r"\bOzon\b", text) else None,
+        "detail_weight_grams": _extract_weight_grams(text),
+        "detail_dimensions_mm": _extract_dimensions_mm(text),
     }
 
 
@@ -378,26 +453,46 @@ async def enrich_products_with_detail(
     cfg = config or {}
     enabled = cfg.get("detail_enrich_enabled", False)
     top_k = int(cfg.get("detail_top_k", 30))
+    if top_k <= 0:
+        top_k = len(products)
+    top_k = min(top_k, len(products))
+    concurrency = max(1, int(cfg.get("detail_concurrency", 1)))
     timeout_ms = int(cfg.get("detail_timeout", 30) * 1000)
     if not enabled or not products:
         return products
 
-    enriched = []
     failed_count = 0
-    for idx, item in enumerate(products):
+    semaphore = asyncio.Semaphore(concurrency)
+
+    async def enrich_one(idx: int, item: dict) -> dict:
+        nonlocal failed_count
         merged = dict(item)
         if idx < top_k and item.get("url"):
             detail_url = urljoin("https://www.ozon.ru", str(item["url"]))
+            detail_page = None
             try:
-                await page.goto(
-                    detail_url, wait_until="domcontentloaded", timeout=timeout_ms
-                )
-                await page.wait_for_timeout(800)
-                html = await page.content()
-                merged.update(extract_detail_fields(html))
+                async with semaphore:
+                    detail_page = await page.context.new_page()
+                    detail_page.set_default_timeout(timeout_ms)
+                    await detail_page.goto(
+                        detail_url, wait_until="domcontentloaded", timeout=timeout_ms
+                    )
+                    await detail_page.wait_for_timeout(800)
+                    html = await detail_page.content()
+                    merged.update(extract_detail_fields(html))
             except Exception:
                 failed_count += 1
-        enriched.append(merged)
+            finally:
+                if detail_page:
+                    try:
+                        await detail_page.close()
+                    except Exception:
+                        pass
+        return merged
+
+    enriched = await asyncio.gather(
+        *(enrich_one(idx, item) for idx, item in enumerate(products))
+    )
 
     if failed_count:
         for row in enriched:
