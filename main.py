@@ -58,7 +58,8 @@ def load_data():
         return pd.DataFrame()
     df = pd.read_excel(path)
     df.columns = [c.strip() for c in df.columns]
-    df["data_source"] = "excel"
+    if "data_source" not in df.columns:
+        df["data_source"] = "excel"
     return df
 
 
