@@ -116,6 +116,32 @@ async def search_and_open(page, keyword: str) -> str | None:
     return None
 
 
+async def wait_for_detail_page(browser, poll_seconds: int = 2, max_wait: int = 120):
+    """Poll until a 1688 detail page appears in any tab. Returns (page, url)."""
+    import time
+    deadline = time.time() + max_wait
+    print(f"Waiting for 1688 product detail page (max {max_wait}s)...")
+    print("  → Open https://www.1688.com/ in the browser")
+    print("  → Search for your product keyword")
+    print("  → Click into a product detail page")
+    print()
+
+    last_url = ""
+    while time.time() < deadline:
+        page, url = await find_1688_detail_tab(browser)
+        if page:
+            return page, url
+        # Show progress when user navigates to new pages
+        for pg in (browser.contexts[0].pages if browser.contexts else []):
+            cur = pg.url or ""
+            if cur != last_url and "1688" in cur:
+                print(f"  Detected: {cur[:100]}")
+                last_url = cur
+        await asyncio.sleep(poll_seconds)
+
+    return None, None
+
+
 async def main_async(args):
     from playwright.async_api import async_playwright
 
@@ -128,23 +154,35 @@ async def main_async(args):
             print("Start Edge with: --remote-debugging-port=9222", file=sys.stderr)
             return 1
 
+        page = None
+
         # Strategy 1: Find existing 1688 detail tab
         page, url = await find_1688_detail_tab(browser)
         if page:
             print(f"Found 1688 detail tab: {url}")
-        else:
-            # Strategy 2: Create new page and search
-            page = await browser.contexts[0].new_page()
-            if args.keyword:
-                opened = await search_and_open(page, args.keyword)
-                if not opened:
-                    print("Manual intervention needed — open a 1688 product in browser")
-                    return 1
-            else:
-                print("No 1688 detail tab found. Use --keyword to search or open manually.")
+        elif args.interactive:
+            # Strategy 2: Interactive mode — wait for user to navigate
+            page, url = await wait_for_detail_page(browser, max_wait=args.timeout)
+            if not page:
+                print("Timeout — no 1688 detail page detected. Open one and retry.")
                 return 1
+            print(f"\nDetected product page: {url}")
+        elif args.keyword:
+            # Strategy 3: Auto-search by keyword
+            page = await browser.contexts[0].new_page()
+            opened = await search_and_open(page, args.keyword)
+            if not opened:
+                print("Auto-search blocked by captcha. Use --interactive mode instead.")
+                return 1
+        else:
+            print("No 1688 detail tab found.")
+            print("Options:")
+            print("  --interactive    Wait for you to manually open a product page")
+            print("  --keyword KEY    Auto-search (may trigger captcha)")
+            return 1
 
         result = await scrape_current_tab(page)
+        # Output as JSON (machine-readable last line)
         print(json.dumps(result, ensure_ascii=False, indent=2))
 
         if not args.keep_open:
@@ -157,6 +195,10 @@ def main():
     parser = argparse.ArgumentParser(description="Scrape 1688 product from open browser tab")
     parser.add_argument("--cdp", default="http://127.0.0.1:9222", help="CDP endpoint")
     parser.add_argument("--keyword", help="Search keyword for 1688")
+    parser.add_argument("--interactive", "-i", action="store_true",
+                        help="Wait for user to manually open 1688 product page")
+    parser.add_argument("--timeout", type=int, default=120,
+                        help="Max wait seconds in interactive mode (default: 120)")
     parser.add_argument("--keep-open", action="store_true", help="Don't close tab after scraping")
     args = parser.parse_args()
     return asyncio.run(main_async(args))
