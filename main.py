@@ -177,16 +177,34 @@ def _update_stable_fields_state(df: pd.DataFrame):
 
 
 def merge_dataframes(existing: pd.DataFrame, scraped: pd.DataFrame) -> pd.DataFrame:
-    """Merge scraped data into existing, deduplicating by SkuId. Excel rows win."""
+    """Merge scraped data into existing, deduplicating by SkuId.
+
+    Excel rows win for existing values. Scraped non-null fields backfill
+    null/NaN cells in Excel rows to preserve detail enrichment data.
+    """
     if scraped.empty:
         return existing.copy()
     if existing.empty:
         return scraped.copy()
 
-    # Keep only scraped rows whose SkuId is NOT already in existing
+    # Backfill: for SKUs in both, fill null Excel cells with scraped non-null values
     existing_skus = set(existing["SkuId"].dropna().astype(int).tolist())
-    new_rows = scraped[~scraped["SkuId"].astype(int).isin(existing_skus)]
+    dup_rows = scraped[scraped["SkuId"].astype(int).isin(existing_skus)]
 
+    if not dup_rows.empty:
+        existing = existing.copy()
+        for _, srow in dup_rows.iterrows():
+            sku = int(srow["SkuId"])
+            idx = existing.index[existing["SkuId"].astype(int) == sku]
+            if len(idx) == 0:
+                continue
+            erow = existing.loc[idx[0]]
+            for col in existing.columns:
+                if pd.isna(erow[col]) and not pd.isna(srow.get(col)):
+                    existing.loc[idx[0], col] = srow[col]
+
+    # Append new scraped rows not already in existing
+    new_rows = scraped[~scraped["SkuId"].astype(int).isin(existing_skus)]
     merged = pd.concat([existing, new_rows], ignore_index=True)
     return merged
 

@@ -1,18 +1,143 @@
-"""1688 supplier enrichment (keyword-first, manual mapping driven).
+"""1688 supplier enrichment (keyword-first, with live scraping fallback).
 
-This module intentionally keeps a conservative implementation:
-- Mapping is required; if keyword is empty -> mapping_miss.
-- Keyword-first strategy; URL is only fallback metadata.
-- Category match is based on third-level category keywords.
-- Slider/captcha handling is manual intervention (status only).
+Scraping strategy:
+- CSV mapping is the primary data source (deterministic, fast)
+- If CSV has no purchase_price/freight_est for a mapped SKU, attempt live
+  Playwright scraping of 1688 search → detail pages
+- Chinese page regex targets: ¥/￥ prices, 运费(freight), 起批(MOQ)
 """
 
 from __future__ import annotations
 
+import asyncio
 import csv
 import os
+import re
+import logging
 from dataclasses import dataclass
 import pandas as pd
+
+log = logging.getLogger(__name__)
+
+# --------------- 1688 Chinese page regex ---------------
+
+# Price: ¥123.45 or ￥123.45
+_1688_PRICE_RE = re.compile(r"[¥￥]\s*(\d+(?:\.\d{1,2})?)")
+# Freight: 运费：¥8.00 or 快递: ￥10
+_1688_FREIGHT_RE = re.compile(
+    r"(?:运费|快递|物流)[^¥￥\d]{0,10}[¥￥]?\s*(\d+(?:\.\d{1,2})?)"
+)
+# MOQ / min order: 起批量 ≥2 or 1件起批
+_1688_MOQ_RE = re.compile(r"(?:起批|起订|≥)\s*(\d+)")
+
+
+def _extract_1688_number(text: str, pattern: re.Pattern) -> float | None:
+    """Extract the first number from text matching the given pattern."""
+    m = pattern.search(text)
+    if not m:
+        return None
+    try:
+        return float(m.group(1))
+    except (ValueError, TypeError):
+        return None
+
+
+async def scrape_1688_product(keyword: str, config: dict) -> dict | None:
+    """Scrape 1688 search result page for a product matching keyword.
+
+    Returns dict with keys: purchase_price, freight_est, status
+    or None if scraping fails entirely.
+    """
+    try:
+        from playwright.async_api import async_playwright
+    except ImportError:
+        log.warning("Playwright not available for 1688 scraping")
+        return None
+
+    keyword_enc = keyword.replace(" ", "+")
+    search_url = (
+        f"https://s.1688.com/selloffer/offer_search.htm?keywords={keyword_enc}"
+    )
+    timeout_ms = int(config.get("timeout", 30)) * 1000
+
+    try:
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(
+                headless=True,
+                args=["--no-sandbox", "--disable-gpu"],
+            )
+            try:
+                context = await browser.new_context(
+                    viewport={"width": 1280, "height": 800},
+                    locale="zh-CN",
+                )
+                page = await context.new_page()
+                page.set_default_timeout(timeout_ms)
+
+                # Navigate to search results
+                resp = await page.goto(search_url, wait_until="domcontentloaded")
+                if resp and resp.status >= 400:
+                    log.warning("1688 search returned HTTP %d for %s", resp.status, keyword)
+                    return None
+
+                await page.wait_for_timeout(3000)
+
+                # Get the first product link from search results
+                first_link = await page.query_selector(
+                    'a[href*="offer"]:not([href*="search"])'
+                )
+                if not first_link:
+                    log.info("No 1688 results for keyword: %s", keyword)
+                    return None
+
+                href = await first_link.get_attribute("href")
+                if not href:
+                    return None
+
+                # Navigate to detail page
+                if not href.startswith("http"):
+                    href = f"https:{href}" if href.startswith("//") else f"https://detail.1688.com{href}"
+                await page.goto(href, wait_until="domcontentloaded")
+                await page.wait_for_timeout(2000)
+
+                text = await page.content()
+
+                # Extract fields from the combined page text
+                purchase_price = _extract_1688_number(text, _1688_PRICE_RE)
+                freight_est = _extract_1688_number(text, _1688_FREIGHT_RE)
+
+                await page.close()
+                await context.close()
+
+                if purchase_price is None:
+                    return {"status": "price_not_found"}
+
+                return {
+                    "purchase_price": purchase_price,
+                    "freight_est": freight_est,
+                    "status": "ok",
+                }
+
+            finally:
+                await browser.close()
+
+    except Exception as e:
+        log.warning("1688 scrape failed for '%s': %s", keyword, e)
+        return None
+
+
+def scrape_1688_sync(keyword: str, config: dict) -> dict | None:
+    """Synchronous wrapper for scrape_1688_product."""
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            loop = asyncio.new_event_loop()
+            result = loop.run_until_complete(scrape_1688_product(keyword, config))
+            loop.close()
+            return result
+        return loop.run_until_complete(scrape_1688_product(keyword, config))
+    except RuntimeError:
+        return asyncio.run(scrape_1688_product(keyword, config))
 
 
 @dataclass
@@ -85,15 +210,28 @@ def is_category_match(ozon_category: str, supplier_item: dict, cfg: dict) -> boo
 
 
 def fetch_supplier_fields(mapped_item: dict, cfg: dict) -> dict:
-    """Fetch supplier fields from mapping/defaults (no live crawl yet)."""
+    """Fetch supplier fields: CSV first, live scrape fallback, defaults last."""
     defaults = cfg.get("default_values", {})
     global_freight = defaults.get("global_freight", 8.0)
-    freight = mapped_item.get("freight_est")
-    if freight is None:
-        freight = global_freight
+
+    purchase_price = mapped_item.get("purchase_price")
+    freight_est = mapped_item.get("freight_est")
+
+    # Attempt live 1688 scraping if CSV has no purchase_price
+    keyword = mapped_item.get("supplier_keyword", "")
+    if purchase_price is None and keyword and cfg.get("live_scrape_enabled", True):
+        log.info("Attempting live 1688 scrape for keyword: %s", keyword)
+        scraped = scrape_1688_sync(keyword, cfg)
+        if scraped and scraped.get("status") == "ok":
+            purchase_price = scraped.get("purchase_price")
+            if scraped.get("freight_est") is not None:
+                freight_est = scraped.get("freight_est")
+
+    if freight_est is None:
+        freight_est = global_freight
     return {
-        "purchase_price": mapped_item.get("purchase_price"),
-        "freight_est": freight,
+        "purchase_price": purchase_price,
+        "freight_est": freight_est,
     }
 
 
